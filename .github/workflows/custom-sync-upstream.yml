@@ -1,0 +1,80 @@
+name: Custom - Sync Upstream Coolify
+
+# Merges coollabsio/coolify main into this fork's main, keeping our customizations.
+# Uses SYNC_TOKEN (a PAT with `repo` + `workflow` scopes) because GITHUB_TOKEN cannot
+# push commits that touch .github/workflows, which upstream changes often.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: custom-sync-upstream
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: coollabsio/coolify
+  UPSTREAM_BRANCH: main
+  TARGET_BRANCH: main
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Merge upstream
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream "${UPSTREAM_BRANCH}"
+
+          BEHIND=$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")
+          echo "behind=${BEHIND}" >> "$GITHUB_OUTPUT"
+          if [ "${BEHIND}" = "0" ]; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+
+          if git merge --no-edit "upstream/${UPSTREAM_BRANCH}"; then
+            git push origin "HEAD:${TARGET_BRANCH}"
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > conflicts.txt
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the merged code
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run custom-build.yml --ref "${TARGET_BRANCH}"
+
+      - name: Report merge conflict
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Upstream sync conflict"
+          BODY=$(printf 'Merging `%s@%s` into `%s` conflicts in:\n\n```\n%s\n```\n\nResolve locally:\n\n```bash\ngit fetch upstream\ngit merge upstream/%s\n# fix conflicts, then\ngit push origin %s\n```' \
+            "${UPSTREAM_REPO}" "${UPSTREAM_BRANCH}" "${TARGET_BRANCH}" "$(cat conflicts.txt)" "${UPSTREAM_BRANCH}" "${TARGET_BRANCH}")
+          EXISTING=$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number')
+          if [ -n "${EXISTING}" ]; then
+            gh issue comment "${EXISTING}" --body "${BODY}"
+          else
+            gh issue create --title "${TITLE}" --body "${BODY}"
+          fi
+          exit 1
