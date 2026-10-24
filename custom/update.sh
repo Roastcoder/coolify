@@ -12,6 +12,5 @@ fi
 
 COMPOSE="docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.custom.yml"
 $COMPOSE pull coolify
-$COMPOSE up -d --remove-orphans --wait coolify
-docker image prune -f >/dev/null
+$COMPOSE up -d --wait coolify
 $COMPOSE ps coolify
