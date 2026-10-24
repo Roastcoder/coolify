@@ -4,6 +4,7 @@
 @import "tw-animate-css";
 
 @import "./utilities.css";
+@import "./custom-theme.css";
 
 @plugin 'tailwind-scrollbar';
 @plugin '@tailwindcss/typography';

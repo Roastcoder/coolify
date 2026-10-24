@@ -1,0 +1,189 @@
+/*
+ * Roastcoder fork: "Developer Slate" theme.
+ *
+ * Kept in its own file so upstream merges of app.css stay conflict-free. Everything
+ * here only re-points Coolify's existing design tokens (see DESIGN.md):
+ *   - slate surface ladder instead of neutral graphite
+ *   - green "run" accent instead of coolLabs purple
+ *   - IBM Plex Sans for UI text, JetBrains Mono for code and logs
+ * Rules are unlayered, so they beat Tailwind's @layer theme values. Selectors that
+ * compete with app.css's own unlayered :root/.dark blocks carry higher specificity.
+ * Custom themes (data-theme="custom") keep driving their own colors.
+ */
+
+@font-face {
+    font-display: swap;
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 100 700;
+    src: url('../fonts/ibm-plex-sans-latin-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 100 700;
+    src: url('../fonts/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    src: url('../fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    src: url('../fonts/jetbrains-mono-latin-ext-wght-normal.woff2') format('woff2-variations');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Theme-level tokens, both schemes. */
+:root {
+    --font-sans: 'IBM Plex Sans', 'Geist Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-geist-sans: var(--font-sans);
+    --font-mono: 'JetBrains Mono', 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --font-logs: var(--font-mono);
+
+    /* 2,300+ neutral-* utilities in the views follow the slate scale. */
+    --color-neutral-50: #f8fafc;
+    --color-neutral-100: #f1f5f9;
+    --color-neutral-200: #e2e8f0;
+    --color-neutral-300: #cbd5e1;
+    --color-neutral-400: #94a3b8;
+    --color-neutral-500: #64748b;
+    --color-neutral-600: #475569;
+    --color-neutral-700: #334155;
+    --color-neutral-800: #1e293b;
+    --color-neutral-900: #0f172a;
+    --color-neutral-950: #020617;
+
+    --color-base: #172033;
+    --color-success: #22c55e;
+
+    /* Light-mode accent fills carry white text: #15803d is 5.0:1. */
+    --color-coollabs-50: #f0fdf4;
+    --color-coollabs: #15803d;
+    --color-coollabs-100: #166534;
+    --color-coollabs-200: #14532d;
+    --color-coollabs-300: #0f3d22;
+
+    /* Dark-mode brand fills carry dark text (--color-brand-foreground). */
+    --color-brand: #22c55e;
+    --color-brand-hover: #4ade80;
+    --color-brand-press: #16a34a;
+    --color-brand-depth: #15803d;
+    --color-brand-light: #4ade80;
+
+    --color-coolgray-100: #172033;
+    --color-coolgray-200: #1e293b;
+    --color-coolgray-300: #222d42;
+    --color-coolgray-400: #273349;
+    --color-coolgray-500: #334155;
+
+    --color-app: #0f172a;
+    --color-panel: #131c2e;
+    --color-surface: #1b2336;
+    --color-raised: #222b3f;
+    --color-selected: #2a3449;
+    --color-fg: #f8fafc;
+    --color-fg-dim: #cbd5e1;
+    --color-fg-faint: #94a3b8;
+    --color-accent: #15803d;
+    --color-hairline: rgb(148 163 184 / 0.12);
+    --color-nav-text: #475569;
+    --color-nav-muted: #64748b;
+    --color-nav-active: #0f172a;
+    --color-log: #0b1220;
+}
+
+/* Light scheme: slate-tinted canvas so white cards lift off it. */
+html:not(.dark):not([data-theme="custom"]) {
+    --coollabs-canvas: #f5f7fa;
+    --coollabs-elevated: #fafbfc;
+    --coollabs-recessed: #f1f5f9;
+    --coollabs-base: #ffffff;
+    --coollabs-fill: #e2e8f0;
+    --coollabs-line: rgb(15 23 42 / 0.1);
+    --coollabs-hairline: #cbd5e1;
+    /* 7.6:1 on white, 6.1:1 on the fill step. */
+    --coollabs-subtle: #475569;
+
+    --color-brand: #15803d;
+    --color-brand-hover: #166534;
+    --color-brand-press: #14532d;
+    --color-brand-depth: #0f3d22;
+    --color-brand-light: #15803d;
+    --color-brand-ring: #4ade80;
+    --color-brand-foreground: #ffffff;
+    --color-success: #15803d;
+}
+
+/* Dark scheme: slate ladder. Beats app.css's `.dark` block on specificity. */
+html.dark:not([data-theme="custom"]) {
+    --color-accent: var(--color-brand);
+    --color-card: #172033;
+    --color-sidebar: #0b1222;
+    --color-app: #0f172a;
+    --color-panel: #131c2e;
+    --coollabs-canvas: var(--color-app);
+    --coollabs-elevated: #1b2336;
+    --coollabs-recessed: #263049;
+    --coollabs-base: #1f2940;
+    --coollabs-fill: #2c3750;
+    --color-surface: #1b2336;
+    --color-raised: #222b3f;
+    --color-selected: #2a3449;
+    --color-log: #0b1220;
+    --coollabs-line: #334155;
+    --coollabs-hairline: #334155;
+    --coollabs-subtle: #94a3b8;
+    --color-nav-text: #cbd5e1;
+    /* 6.9:1 on the panel, so 11px section labels clear AA. */
+    --color-nav-muted: #94a3b8;
+    --color-nav-active: #f8fafc;
+    --color-fg-faint: #94a3b8;
+    --color-error: #f87171;
+    --color-brand-ring: #4ade80;
+    /* Dark green-950 on #22c55e is 8.6:1; white would only be 2.3:1. */
+    --color-brand-foreground: #052e16;
+}
+
+/* Interaction basics the design-system checklist asks for. :where() keeps these at
+   zero specificity so every component rule in app.css still wins. */
+:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a[href], summary, select, label[for], input[type="checkbox"], input[type="radio"]) {
+    cursor: pointer;
+}
+
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand-ring, #4ade80);
+    outline-offset: 2px;
+}
+
+::selection {
+    background-color: rgb(34 197 94 / 0.3);
+}
+
+:where(table, .font-mono, .font-logs, code, pre, kbd) {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

@@ -77,7 +77,7 @@
         };
         window.customThemePresets = [
             // The built-in Dark theme, not a custom theme. Its colors start the fields when the user edits it.
-            { name: 'Coolify', theme: null, swatch: { sidebar: '#0d0d0d', selected: '#1c1c1c', accent: '#6b16ed', background: '#0a0a0a' } },
+            { name: 'Coolify', theme: null, swatch: { sidebar: '#0b1222', selected: '#2a3449', accent: '#22c55e', background: '#0f172a' } },
             { name: 'Midnight', theme: { sidebar: '#0f172a', selected: '#2e4a7d', accent: '#f2458f', background: '#1a2338' } },
             { name: 'Forest', theme: { sidebar: '#12342b', selected: '#2c6e57', accent: '#f4b860', background: '#1b2a25' } },
             { name: 'Ember', theme: { sidebar: '#3b1410', selected: '#8f2d1f', accent: '#ffb86b', background: '#241816' } },
@@ -135,7 +135,7 @@
             delete root.dataset.sidebarScheme;
             root.style.setProperty('--theme-base-color', window.hexToOklch(localStorage.themeColor));
             root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
-            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0f172a' : '#f5f7fa');
         };
         // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
         window.themeControls = () => ({
@@ -240,7 +240,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#101010" id="theme-color-meta" />
+    <meta name="theme-color" content="#0f172a" id="theme-color-meta" />
     <meta name="color-scheme" content="dark light" />
     <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -273,10 +273,9 @@
     @env('local')
         <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
     @else
-        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="32x32" />
-        <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
+        <link rel="icon" href="{{ asset('mehar-favicon.png') }}" type="image/png" />
     @endenv
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}" />
+    <link rel="apple-touch-icon" href="{{ asset('mehar-apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
     <meta name="apple-mobile-web-app-title" content="Coolify" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -286,7 +285,7 @@
         const isDark = document.documentElement.classList.contains('dark');
         document.getElementById('theme-color-meta')?.setAttribute('content', document.documentElement.dataset.theme === 'custom'
             ? window.storedCustomTheme().background
-            : (isDark ? '#101010' : '#ffffff'));
+            : (isDark ? '#0f172a' : '#f5f7fa'));
     </script>
     <style>
         [x-cloak] {
