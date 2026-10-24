@@ -60,7 +60,7 @@
                     @if (isInstanceAdmin() && !isCloud())
                         <div x-show="!collapsed" class="ml-auto shrink-0">
                             @persist('upgrade')
-                                <livewire:upgrade />
+                                <livewire:custom-upgrade />
                             @endpersist
                         </div>
                     @endif
@@ -153,7 +153,7 @@
                     <div id="configuration-warning-hud-slot-mobile" class="relative shrink-0"></div>
                     <livewire:deployments-indicator variant="mobile" />
                     @if (isInstanceAdmin() && !isCloud())
-                        <livewire:upgrade key="mobile-upgrade" />
+                        <livewire:custom-upgrade key="mobile-upgrade" />
                     @endif
                     <x-top-user-menu />
                     <button type="button" x-on:click="open = !open"

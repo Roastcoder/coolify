@@ -11,7 +11,7 @@
             <x-application.settings-section title="Updates"
                 helper="Install the latest Coolify version manually when an update is available.">
                 <x-slot:actions>
-                    <livewire:upgrade :full-button="true" key="settings-upgrade" />
+                    <livewire:custom-upgrade :full-button="true" key="settings-upgrade" />
                     <x-forms.button type="button" wire:click="checkManually">
                         <x-reicon name="refresh" class="size-3.5" />
                         Check now

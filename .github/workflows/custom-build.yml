@@ -39,6 +39,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Record build commit for the Update button
+        run: sed -i "s/'sha' => null,/'sha' => '${GITHUB_SHA}',/" config/custom_build.php && grep -q "${GITHUB_SHA}" config/custom_build.php
+
       - name: Resolve image name and version
         id: version
         run: |
