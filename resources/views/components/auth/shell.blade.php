@@ -7,8 +7,10 @@
     <div class="auth-shell-content">
         <div class="auth-card">
             <div class="auth-card-heading">
-                <img src="/mehar-logo.png" alt="Mehar Finance"
-                    class="mb-4 h-10 w-auto rounded-lg dark:bg-white dark:px-2 dark:py-1" />
+                <div class="mb-4 flex items-center gap-2.5">
+                    <img src="/standalonecoders-mark.svg" alt="" class="size-9 shrink-0" />
+                    <span class="text-lg tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span></span>
+                </div>
                 <h1>{{ $title }}</h1>
                 @if ($description)
                     <p>{{ $description }}</p>

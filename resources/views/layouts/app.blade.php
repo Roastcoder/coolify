@@ -48,13 +48,11 @@
                 <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-neutral-50 dark:border-white/[0.04] dark:bg-app transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0 border-b' : 'w-56 px-4'">
                     <div class="flex items-baseline gap-1.5 min-w-0">
-                        <a href="/" {{ wireNavigate() }} title="Mehar Finance"
-                            class="flex shrink-0 items-center hover:opacity-80 transition-opacity">
-                            {{-- Logo artwork is dark-on-light, so it sits on a white chip in dark mode. --}}
-                            <img x-show="collapsed" x-cloak src="/mehar-emblem.png" alt="Mehar Finance"
-                                class="size-7 rounded-md dark:bg-white dark:p-0.5" />
-                            <img x-show="!collapsed" src="/mehar-logo.png" alt="Mehar Finance"
-                                class="h-7 w-auto rounded-md dark:bg-white dark:px-1.5 dark:py-0.5" />
+                        <a href="/" {{ wireNavigate() }} title="StandaloneCoders"
+                            class="flex shrink-0 items-center gap-2 hover:opacity-80 transition-opacity">
+                            <img src="/standalonecoders-mark.svg" alt="StandaloneCoders" class="size-6 shrink-0" />
+                            {{-- Wordmark as text so it follows the light/dark scheme. --}}
+                            <span x-show="!collapsed" class="text-[14px] tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span></span>
                         </a>
                         <x-version x-show="!collapsed" title="v{{ config('constants.coolify.version') }}"
                             class="min-w-0 truncate !text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
@@ -141,8 +139,8 @@
                 class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 gap-x-4 sm:px-6 lg:hidden bg-white/95 dark:bg-panel/95 backdrop-blur-sm border-b border-neutral-200/60 dark:border-white/[0.06]">
                 <div class="flex min-w-0 flex-1 items-center gap-2.5">
                     <a href="/"
-                        class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white transition-opacity hover:opacity-80">
-                        <img src="/mehar-emblem.png" alt="Mehar Finance" class="size-6" />
+                        class="flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-80">
+                        <img src="/standalonecoders-mark.svg" alt="StandaloneCoders" class="size-8" />
                     </a>
                     <div class="min-w-0" x-data="{ collapsed: false }">
                         <livewire:switch-team />

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="StandaloneCoders">
+  <rect width="64" height="64" rx="14" fill="#101613"/>
+  <g fill="none" stroke-linejoin="round" stroke-linecap="butt">
+    <!-- C: two lime arms, split by the S -->
+    <path d="M49.5 26.8 H37.4 L31.6 30.6" stroke="#BEFA49" stroke-width="7"/>
+    <path d="M49.5 46.3 H38.6 L31.2 41.4" stroke="#BEFA49" stroke-width="7"/>
+    <!-- S: dark outline first to cut a gap into the C, then the white letter -->
+    <path d="M43.3 16.3 H21.4 L12.4 24.4 L30.4 33.8 L24.9 39.8 H18.2 L10.3 34" stroke="#101613" stroke-width="11.4"/>
+    <path d="M43.3 16.3 H21.4 L12.4 24.4 L30.4 33.8 L24.9 39.8 H18.2 L10.3 34" stroke="#F3F4F0" stroke-width="8"/>
+  </g>
+</svg>

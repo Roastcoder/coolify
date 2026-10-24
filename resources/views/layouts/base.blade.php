@@ -273,9 +273,10 @@
     @env('local')
         <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
     @else
-        <link rel="icon" href="{{ asset('mehar-favicon.png') }}" type="image/png" />
+        <link rel="icon" href="{{ asset('standalonecoders-favicon.png') }}" sizes="64x64" type="image/png" />
+        <link rel="icon" href="{{ asset('standalonecoders-mark.svg') }}" type="image/svg+xml" />
     @endenv
-    <link rel="apple-touch-icon" href="{{ asset('mehar-apple-touch-icon.png') }}" />
+    <link rel="apple-touch-icon" href="{{ asset('standalonecoders-apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
     <meta name="apple-mobile-web-app-title" content="Coolify" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
