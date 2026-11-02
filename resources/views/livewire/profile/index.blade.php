@@ -127,6 +127,8 @@
                         </div>
                     </div>
                     <x-forms.input id="name" label="Name" required />
+                    <x-forms.input id="phone" label="Mobile number" placeholder="9876543210"
+                        helper="Used for the SMS code after you sign in with your password. Leave empty to turn the SMS code off." />
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
                         <x-forms.button @click="openEmailModal()" type="button"

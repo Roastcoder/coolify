@@ -50,6 +50,7 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'current_team_id',
         'force_password_reset',

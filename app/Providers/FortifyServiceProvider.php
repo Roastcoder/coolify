@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\RedirectIfTwoFactorOrSmsOtp;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Models\OauthSetting;
@@ -11,6 +12,7 @@ use App\Support\PasskeyRelyingParty;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Fortify\Contracts\RedirectsIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
 
@@ -40,6 +42,9 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Fork-only: adds the SMS code step for users with a mobile number.
+        $this->app->singleton(RedirectsIfTwoFactorAuthenticatable::class, RedirectIfTwoFactorOrSmsOtp::class);
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
             $isFirstUser = User::count() === 0;

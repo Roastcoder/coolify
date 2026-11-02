@@ -29,6 +29,8 @@ class Index extends Component
     #[Validate('required')]
     public string $name;
 
+    public string $phone = '';
+
     public string $new_email = '';
 
     public string $email_verification_code = '';
@@ -79,6 +81,7 @@ class Index extends Component
         $this->userId = Auth::id();
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->phone = (string) Auth::user()->phone;
 
         $oauthIdentity = Auth::user()->oauthIdentities()->latest('id')->first();
         $this->uses_sso = $oauthIdentity !== null;
@@ -96,11 +99,14 @@ class Index extends Component
         try {
             $this->validate([
                 'name' => 'required',
-            ]);
+                // 10-digit Indian mobile number, used for the SMS login code.
+                'phone' => ['nullable', 'regex:/^[6-9][0-9]{9}$/'],
+            ], ['phone.regex' => 'Enter a 10-digit mobile number without +91.']);
             Auth::user()->update([
                 'name' => $this->name,
+                'phone' => $this->phone === '' ? null : $this->phone,
             ]);
-            auditLog('ui.user.profile_updated', $this->auditContext(['changed_fields' => ['name']]));
+            auditLog('ui.user.profile_updated', $this->auditContext(['changed_fields' => ['name', 'phone']]));
 
             $this->dispatch('success', 'Profile updated.');
         } catch (\Throwable $e) {

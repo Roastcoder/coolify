@@ -19,6 +19,7 @@ use App\Http\Controllers\FileBrowserDownloadController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
+use App\Http\Controllers\SmsOtpLoginController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\UseSessionTeamApiToken;
@@ -149,6 +150,12 @@ use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
+// Fork-only: SMS code step after a correct password (see RedirectIfTwoFactorOrSmsOtp).
+Route::middleware('guest')->group(function () {
+    Route::get('/login/sms', [SmsOtpLoginController::class, 'show'])->name('login.sms-otp');
+    Route::post('/login/sms', [SmsOtpLoginController::class, 'check'])->middleware('throttle:10,1')->name('login.sms-otp.verify');
+    Route::post('/login/sms/resend', [SmsOtpLoginController::class, 'resend'])->middleware('throttle:3,10')->name('login.sms-otp.resend');
+});
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
