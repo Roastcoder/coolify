@@ -93,3 +93,12 @@ jobs:
             "${IMAGE}:${GITHUB_SHA}-aarch64" \
             --tag "${IMAGE}:${GITHUB_SHA::7}" \
             --tag "${IMAGE}:latest"
+
+      # The product image. The coolify name above stays for servers set up before the rename.
+      - name: Publish StandaloneCoders Cloud tags
+        run: |
+          OLD="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/coolify"
+          NEW="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/standalonecoders-cloud"
+          docker buildx imagetools create "${OLD}:${GITHUB_SHA::7}" \
+            --tag "${NEW}:${GITHUB_SHA::7}" \
+            --tag "${NEW}:latest"

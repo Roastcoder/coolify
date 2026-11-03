@@ -1,4 +1,22 @@
-# Roastcoder Coolify fork
+# StandaloneCoders Cloud
+
+A self-hosted deploy platform built on [Coolify](https://github.com/coollabsio/coolify), with a built-in mail server,
+SMS sign-in codes and the StandaloneCoders look.
+
+## Install
+
+On a fresh Ubuntu or Debian server, as root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo bash
+```
+
+The same command switches an existing Coolify server to StandaloneCoders Cloud; your projects stay.
+New versions show up under **Settings > Updates** with an **Update** button.
+
+## How this repo works
+
+This repo tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and adds our own changes on `main`.
 
 This fork tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and adds our own changes on `main`.
 
@@ -8,7 +26,8 @@ This fork tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and
    (or manually from the Actions tab). It merges upstream `main` into our `main`. Our changes are kept.
    If upstream touches the same lines we changed, it opens an issue named "Upstream sync conflict" instead.
 2. **Custom - Build Coolify Image** (`.github/workflows/custom-build.yml`) runs on every push to `main`
-   and after each successful sync. It publishes `ghcr.io/roastcoder/coolify:latest` (amd64 + arm64).
+   and after each successful sync. It publishes `ghcr.io/roastcoder/standalonecoders-cloud:latest` (amd64 + arm64), and the same image as
+   `ghcr.io/roastcoder/coolify:latest` for servers set up before the rename.
 3. The Coolify server pulls that image with `custom/update.sh`.
 
 ## One-time setup

@@ -1,7 +1,7 @@
-# Copy to /data/coolify/source/docker-compose.custom.yml on your Coolify server.
+# Copy to /data/coolify/source/docker-compose.custom.yml on your server (custom/install.sh does it).
 # Coolify loads this file on top of its own compose files, so the instance runs
-# the image built from this fork instead of the official coollabsio/coolify one.
+# StandaloneCoders Cloud instead of the official coollabsio/coolify image.
 services:
   coolify:
-    image: "ghcr.io/roastcoder/coolify:latest"
+    image: "ghcr.io/roastcoder/standalonecoders-cloud:latest"
     pull_policy: always

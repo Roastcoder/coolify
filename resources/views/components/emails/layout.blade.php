@@ -1,6 +1,6 @@
 {{-- Fork-only: StandaloneCoders branded email shell. Inline styles and tables, since mail apps ignore stylesheets. --}}
 @php
-    $brandName = data_get(instanceSettings(), 'smtp_from_name') ?: 'StandaloneCoders';
+    $brandName = data_get(instanceSettings(), 'smtp_from_name') ?: config('custom_build.product_name');
     $baseUrl = rtrim(base_url(), '/');
 @endphp
 <!DOCTYPE html>

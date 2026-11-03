@@ -7,7 +7,7 @@
             @if ($currentState === 'welcome')
                 <div class="w-full max-w-3xl">
                     <div class="mb-6 text-center">
-                        <h1 class="text-2xl! font-semibold!">Welcome to Coolify</h1>
+                        <h1 class="text-2xl! font-semibold!">Welcome to {{ config('custom_build.product_name') }}</h1>
                         <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
                             Connect your first server and start deploying in minutes.
                         </p>

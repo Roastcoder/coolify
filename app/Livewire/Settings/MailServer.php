@@ -232,7 +232,7 @@ class MailServer extends Component
                 'smtp_username' => $email,
                 'smtp_password' => $password,
                 'smtp_from_address' => $email,
-                'smtp_from_name' => $settings->smtp_from_name ?: 'StandaloneCoders',
+                'smtp_from_name' => $settings->smtp_from_name ?: config('custom_build.product_name'),
             ]);
             $this->dispatch('success', "Coolify now sends email from {$email}.");
         } catch (\Throwable $e) {

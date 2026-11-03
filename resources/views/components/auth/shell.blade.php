@@ -11,7 +11,7 @@
                     <img src="/standalonecoders-mark.svg" alt="" class="size-9 shrink-0" />
                     <span class="text-lg tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span></span>
                 </div>
-                <h1>{{ $title }}</h1>
+                <h1>{{ $title === 'Coolify' ? config('custom_build.product_name') : $title }}</h1>
                 @if ($description)
                     <p>{{ $description }}</p>
                 @endif

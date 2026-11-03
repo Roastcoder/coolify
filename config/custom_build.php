@@ -7,6 +7,7 @@
  */
 
 return [
+    'product_name' => env('PRODUCT_NAME', 'StandaloneCoders Cloud'),
     'repository' => env('CUSTOM_BUILD_REPOSITORY', 'Roastcoder/coolify'),
     'workflow' => env('CUSTOM_BUILD_WORKFLOW', 'custom-build.yml'),
     'branch' => env('CUSTOM_BUILD_BRANCH', 'main'),

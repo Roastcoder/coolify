@@ -52,7 +52,7 @@
                             class="flex shrink-0 items-center gap-2 hover:opacity-80 transition-opacity">
                             <img src="/standalonecoders-mark.svg" alt="StandaloneCoders" class="size-6 shrink-0" />
                             {{-- Wordmark as text so it follows the light/dark scheme. --}}
-                            <span x-show="!collapsed" class="text-[14px] tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span></span>
+                            <span x-show="!collapsed" class="text-[14px] tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span> <span class="font-normal text-neutral-500 dark:text-fg-dim">Cloud</span></span>
                         </a>
                         <x-version x-show="!collapsed" title="v{{ config('constants.coolify.version') }}"
                             class="min-w-0 truncate !text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
@@ -105,9 +105,9 @@
                         <div data-mobile-sidebar-brand
                             class="flex h-12 shrink-0 items-center justify-between gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
                             <div class="flex min-w-0 items-baseline gap-1.5">
-                                <a href="/" {{ wireNavigate() }} title="Coolify"
+                                <a href="/" {{ wireNavigate() }} title="{{ config('custom_build.product_name') }}"
                                     class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
-                                    Coolify
+                                    {{ config('custom_build.product_name') }}
                                 </a>
                                 <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
                             </div>

@@ -253,7 +253,7 @@
     <meta property="og:url" content="https://coolify.io" />
     <meta property="og:title" content="Coolify" />
     <meta property="og:description" content="An open-source & self-hostable Heroku / Netlify / Vercel alternative." />
-    <meta property="og:site_name" content="Coolify" />
+    <meta property="og:site_name" content="{{ config('custom_build.product_name') }}" />
     <meta property="og:image" content="https://cdn.coollabs.io/og-images/coolify.png" />
     @use('App\Models\InstanceSettings')
     @php
@@ -269,7 +269,7 @@
             }
         }
     @endphp
-    <title>{{ $name }}{{ $title ?? 'Coolify' }}</title>
+    <title>{{ $name }}{{ str_replace('Coolify', config('custom_build.product_name'), $title ?? 'Coolify') }}</title>
     @env('local')
         <link rel="icon" href="{{ asset('coolify-logo-dev-transparent.png') }}" type="image/png" />
     @else
