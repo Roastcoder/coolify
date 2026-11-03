@@ -79,6 +79,8 @@ it('adds a domain and starts the hidden mail container', function () {
         ->and($commands)->toContain(MailServer::IMAGE)
         ->and($commands)->toContain('dynamic/coolify-mail.yaml')
         ->and($commands)->toContain('docker run -d --name coolify-webmail')
+        ->and($commands)->toContain('/var/www/html/plugins/standalonecoders_theme:ro')
+        ->and($commands)->toContain(base64_encode(file_get_contents(resource_path('mail/webmail-theme/theme.css'))))
         ->and($commands)->toContain(base64_encode($this->mail->proxyRoute('mail.example.com')));
 });
 

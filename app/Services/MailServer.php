@@ -29,6 +29,9 @@ class MailServer
 
     public const WEBMAIL_CONTAINER = 'coolify-webmail';
 
+    /** Bump when the webmail container needs recreating, for example for a new mount. */
+    public const WEBMAIL_REVISION = 2;
+
     public const WEBMAIL_IMAGE = 'roundcube/roundcubemail:1.6.20-apache';
 
     public function primaryDomain(): ?string
@@ -70,8 +73,8 @@ class MailServer
             'if [ "$(docker inspect -f "{{.State.Running}}" '.self::CONTAINER.' 2>/dev/null)" = "true" ]; then docker kill -s USR2 '.self::CONTAINER.' >/dev/null; '
                 .'else docker rm -f '.self::CONTAINER.' >/dev/null 2>&1; docker run -d --name '.self::CONTAINER.' --restart unless-stopped '
                 .'-e MADDY_HOSTNAME='.escapeshellarg($hostname).' -e MADDY_DOMAIN='.escapeshellarg((string) $this->primaryDomain())." {$ports} -v {$data}:/data ".self::IMAGE.' >/dev/null; fi',
-            "mkdir -p {$data}/webmail/db {$data}/webmail/config",
-            $this->writeFile("{$data}/webmail/config/branding.php", "<?php\n\$config['product_name'] = 'StandaloneCoders Mail';\n"),
+            "mkdir -p {$data}/webmail/db {$data}/webmail/config {$data}/webmail/plugins/standalonecoders_theme",
+            ...$this->webmailThemeCommands(),
             $this->webmailCommand($hostname),
         ]);
 
@@ -365,21 +368,44 @@ http:
 YAML;
     }
 
-    /** Starts Roundcube, or recreates it when the mail hostname changed. */
+    /**
+     * Writes the StandaloneCoders Mail theme (a Roundcube plugin in resources/mail/webmail-theme) and the
+     * config that turns it on. The plugin folder is mounted, so a new theme shows without a restart.
+     *
+     * @return array<int, string>
+     */
+    public function webmailThemeCommands(): array
+    {
+        $data = self::DATA_PATH;
+        $plugin = "{$data}/webmail/plugins/standalonecoders_theme";
+        $source = resource_path('mail/webmail-theme');
+
+        return [
+            $this->writeFile("{$plugin}/standalonecoders_theme.php", file_get_contents("{$source}/standalonecoders_theme.php")),
+            $this->writeFile("{$plugin}/theme.css", file_get_contents("{$source}/theme.css")),
+            $this->writeFile("{$plugin}/logo.svg", file_get_contents(public_path('standalonecoders-mark.svg'))),
+            $this->writeFile("{$data}/webmail/config/branding.php", "<?php\n\$config['product_name'] = 'StandaloneCoders Mail';\n"
+                ."\$config['skin_logo'] = 'plugins/standalonecoders_theme/logo.svg';\n"
+                ."\$config['plugins'][] = 'standalonecoders_theme';\n"),
+        ];
+    }
+
+    /** Starts Roundcube, or recreates it when the mail hostname or WEBMAIL_REVISION changed. */
     public function webmailCommand(string $hostname): string
     {
         $data = self::DATA_PATH;
         $name = self::WEBMAIL_CONTAINER;
         $label = 'coolify.mail.hostname';
+        $labelValue = "{$hostname}@".self::WEBMAIL_REVISION;
         $server = escapeshellarg("ssl://{$hostname}");
 
-        return "if [ \"\$(docker inspect -f '{{index .Config.Labels \"{$label}\"}}' {$name} 2>/dev/null)\" != ".escapeshellarg($hostname).' ]; then '
+        return "if [ \"\$(docker inspect -f '{{index .Config.Labels \"{$label}\"}}' {$name} 2>/dev/null)\" != ".escapeshellarg($labelValue).' ]; then '
             ."docker rm -f {$name} >/dev/null 2>&1; docker run -d --name {$name} --restart unless-stopped --network coolify "
-            .'--label '.escapeshellarg("{$label}={$hostname}")
+            .'--label '.escapeshellarg("{$label}={$labelValue}")
             ." -e ROUNDCUBEMAIL_DEFAULT_HOST={$server} -e ROUNDCUBEMAIL_DEFAULT_PORT=993"
             ." -e ROUNDCUBEMAIL_SMTP_SERVER={$server} -e ROUNDCUBEMAIL_SMTP_PORT=465"
             .' -e ROUNDCUBEMAIL_DB_TYPE=sqlite -e ROUNDCUBEMAIL_SKIN=elastic'
-            ." -v {$data}/webmail/db:/var/roundcube/db -v {$data}/webmail/config:/var/roundcube/config "
+            ." -v {$data}/webmail/db:/var/roundcube/db -v {$data}/webmail/config:/var/roundcube/config -v {$data}/webmail/plugins/standalonecoders_theme:/var/www/html/plugins/standalonecoders_theme:ro "
             .self::WEBMAIL_IMAGE.' >/dev/null; fi';
     }
 

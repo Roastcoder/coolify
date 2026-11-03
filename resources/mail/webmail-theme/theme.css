@@ -1,0 +1,408 @@
+/*
+ * StandaloneCoders Mail: an Outlook-style layout in the StandaloneCoders brand colors,
+ * layered over Roundcube's Elastic skin. Elastic pins many colors with specific selectors,
+ * hence the !important flags. Light surfaces skip dark mode, which keeps Elastic's dark palette.
+ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+    --sc-brand: #16a34a;
+    --sc-brand-strong: #15803d;
+    --sc-brand-deep: #14532d;
+    --sc-brand-soft: #dcfce7;
+    --sc-brand-tint: #f0fdf4;
+    --sc-bar: #0f5132;
+    --sc-canvas: #f3f5f8;
+    --sc-pane: #f8fafc;
+    --sc-line: #e2e8f0;
+    --sc-text: #0f172a;
+    --sc-muted: #64748b;
+}
+
+html body,
+html body .form-control,
+html body .btn,
+html body button,
+html body input,
+html body select,
+html body textarea {
+    font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Accent: links, primary buttons, focus, counts. Applies in light and dark mode. */
+a,
+.listing li a.active,
+.unreadcount,
+.listing li .unreadcount {
+    color: var(--sc-brand-strong);
+}
+
+html.dark-mode a {
+    color: #4ade80;
+}
+
+.btn-primary,
+.button.mainaction,
+button.mainaction,
+input.mainaction,
+.btn.btn-primary,
+.floating-action-buttons a.button,
+.ui-dialog .ui-dialog-buttonset .mainaction {
+    background-color: var(--sc-brand) !important;
+    border-color: var(--sc-brand) !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+
+.btn-primary:hover,
+.button.mainaction:hover,
+button.mainaction:hover,
+.btn.btn-primary:hover {
+    background-color: var(--sc-brand-strong) !important;
+    border-color: var(--sc-brand-strong) !important;
+}
+
+.form-control,
+.custom-select,
+input.form-control,
+.input-group > .form-control {
+    border-radius: 8px;
+}
+
+.form-control:focus,
+.custom-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--sc-brand) !important;
+    box-shadow: 0 0 0 3px rgb(22 163 74 / 0.2) !important;
+    outline: none !important;
+}
+
+.custom-switch .custom-control-input:checked ~ .custom-control-label::before,
+.custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--sc-brand) !important;
+    border-color: var(--sc-brand) !important;
+}
+
+/* ---------- Desktop: Outlook frame (top bar, app rail, folders, list, reading pane) ---------- */
+
+html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print)::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 48px;
+    background: linear-gradient(90deg, var(--sc-bar), var(--sc-brand-strong));
+    z-index: 5;
+}
+
+html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print)::after {
+    content: 'StandaloneCoders Mail';
+    position: fixed;
+    top: 0;
+    left: 72px;
+    height: 48px;
+    line-height: 48px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    z-index: 6;
+    pointer-events: none;
+}
+
+html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print) #layout {
+    position: fixed;
+    inset: 48px 0 0 0;
+    height: auto;
+}
+
+/* App rail */
+html:not(.dark-mode) #layout-menu {
+    background: var(--sc-pane) !important;
+    border-right: 1px solid var(--sc-line);
+}
+
+html:is(.layout-large, .layout-normal) body:not(.task-login) #layout-menu .popover-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 64px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    z-index: 7;
+}
+
+html:is(.layout-large, .layout-normal) body:not(.task-login) #layout-menu #logo {
+    max-height: 28px;
+    max-width: 28px;
+    margin: 0;
+}
+
+html:not(.dark-mode) #taskmenu a {
+    color: #475569 !important;
+    border-radius: 10px;
+    margin: 2px 6px;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+
+html:not(.dark-mode) #taskmenu a:hover {
+    background: #eef2f6 !important;
+    color: var(--sc-text) !important;
+}
+
+#taskmenu a.selected,
+html:not(.dark-mode) #taskmenu a.selected {
+    background: var(--sc-brand-soft) !important;
+    color: var(--sc-brand-deep) !important;
+    box-shadow: inset 3px 0 0 var(--sc-brand);
+}
+
+/* "New mail": the one solid button in the rail, like Outlook's. */
+#taskmenu a.compose,
+html:not(.dark-mode) #taskmenu a.compose {
+    background: var(--sc-brand) !important;
+    color: #fff !important;
+    margin: 10px 8px 12px;
+    box-shadow: 0 6px 14px -6px rgb(22 163 74 / 0.6);
+}
+
+#taskmenu a.compose:hover {
+    background: var(--sc-brand-strong) !important;
+    color: #fff !important;
+}
+
+/* Panes */
+html:not(.dark-mode) #layout-sidebar {
+    background: var(--sc-pane) !important;
+    border-right: 1px solid var(--sc-line);
+}
+
+html:not(.dark-mode) #layout-list {
+    background: #fff !important;
+    border-right: 1px solid var(--sc-line);
+}
+
+html:not(.dark-mode) #layout-content {
+    background: var(--sc-canvas) !important;
+}
+
+html:not(.dark-mode) :is(#layout-sidebar, #layout-list, #layout-content) > .header {
+    background: #fff !important;
+    border-bottom: 1px solid var(--sc-line) !important;
+}
+
+html:not(.dark-mode) #layout-sidebar > .header {
+    background: var(--sc-pane) !important;
+}
+
+.header .header-title {
+    font-weight: 600;
+    color: var(--sc-text);
+}
+
+html.dark-mode .header .header-title {
+    color: inherit;
+}
+
+/* Folder list */
+.treelist li > a,
+.listing.folderlist li > a {
+    border-radius: 8px;
+    margin: 1px 8px;
+    transition: background-color 120ms ease;
+}
+
+html:not(.dark-mode) .treelist li > a:hover {
+    background: #eef2f6;
+}
+
+.treelist li.selected > a,
+.listing li.selected > a,
+html:not(.dark-mode) .listing li.selected {
+    background-color: transparent !important;
+}
+
+.treelist li.selected > a,
+.listing.folderlist li.selected > a {
+    background: var(--sc-brand-soft) !important;
+    color: var(--sc-brand-deep) !important;
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--sc-brand);
+}
+
+html.dark-mode .treelist li.selected > a,
+html.dark-mode .listing.folderlist li.selected > a {
+    background: rgb(22 163 74 / 0.18) !important;
+    color: #bbf7d0 !important;
+}
+
+.treelist .unreadcount,
+.listing li .unreadcount,
+.listing li.selected .unreadcount {
+    background: transparent !important;
+    color: var(--sc-brand-strong) !important;
+    font-weight: 700;
+}
+
+/* Search box above the list, like Outlook's search field */
+html:not(.dark-mode) #layout-list .searchbar {
+    margin: 10px 12px;
+    background: var(--sc-canvas);
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+html:not(.dark-mode) #layout-list .searchbar:focus-within {
+    background: #fff;
+    border-color: var(--sc-brand);
+}
+
+/* Message list: two-line rows, a green bar for unread, a tinted row for the open message */
+table.messagelist tr td {
+    border-bottom: 1px solid #eef1f5 !important;
+}
+
+html:not(.dark-mode) table.messagelist tr:hover td {
+    background-color: #f6f8fb !important;
+}
+
+table.messagelist tr.unread td:first-child {
+    box-shadow: inset 3px 0 0 var(--sc-brand);
+}
+
+table.messagelist tr.unread td.subject span.subject a,
+table.messagelist tr.unread .fromto,
+table.messagelist tr.unread td.subject a {
+    font-weight: 700;
+    color: var(--sc-text);
+}
+
+html.dark-mode table.messagelist tr.unread td.subject a {
+    color: inherit;
+}
+
+table.messagelist tr.selected td,
+html:not(.dark-mode) table.messagelist tr.selected td,
+table.listing tr.selected td {
+    background-color: #e8f6ee !important;
+    color: var(--sc-text) !important;
+}
+
+html.dark-mode table.messagelist tr.selected td {
+    background-color: rgb(22 163 74 / 0.18) !important;
+    color: inherit !important;
+}
+
+table.listing tr.focused > td:first-child,
+.listing li.focused {
+    border-left-color: var(--sc-brand) !important;
+}
+
+table.messagelist td.subject span.date,
+table.messagelist td.subject span.size {
+    color: var(--sc-muted);
+    font-size: 12px;
+}
+
+/* Reading pane as a card */
+html:is(.layout-large, .layout-normal):not(.dark-mode) #layout-content > .iframe-wrapper,
+html:is(.layout-large, .layout-normal):not(.dark-mode) #layout-content > .content.frame-content {
+    margin: 12px;
+    border: 1px solid var(--sc-line);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
+}
+
+html:not(.dark-mode) #layout-content .watermark {
+    background-color: transparent;
+}
+
+/* ---------- Sign-in page ---------- */
+
+body.task-login {
+    background: var(--sc-canvas) !important;
+}
+
+body.task-login #layout-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100%;
+    padding-top: 12vh;
+    background:
+        radial-gradient(900px 420px at 50% -10%, rgb(34 197 94 / 0.16), transparent 70%),
+        var(--sc-canvas) !important;
+}
+
+html.dark-mode body.task-login,
+html.dark-mode body.task-login #layout-content {
+    background: radial-gradient(900px 420px at 50% -10%, rgb(34 197 94 / 0.14), transparent 70%), #0b1120 !important;
+}
+
+body.task-login #logo {
+    max-height: 56px;
+    margin: 0 auto 20px;
+}
+
+body.task-login #login-form {
+    width: 100%;
+    max-width: 400px;
+    padding: 32px 32px 24px;
+    background: #fff;
+    border: 1px solid var(--sc-line);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05), 0 20px 48px -20px rgb(15 23 42 / 0.25);
+}
+
+html.dark-mode body.task-login #login-form {
+    background: #111827;
+    border-color: rgb(148 163 184 / 0.2);
+}
+
+body.task-login #login-form::before {
+    content: 'Sign in to your mailbox';
+    display: block;
+    margin-bottom: 20px;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--sc-text);
+}
+
+html.dark-mode body.task-login #login-form::before {
+    color: #f8fafc;
+}
+
+body.task-login #login-form .form-control {
+    height: 44px;
+}
+
+body.task-login #login-form table td.title {
+    font-weight: 500;
+    color: #334155;
+}
+
+body.task-login #rcmloginsubmit {
+    background-image: none !important;
+    opacity: 1 !important;
+    text-transform: none !important;
+    letter-spacing: 0;
+    width: 100%;
+    height: 44px;
+    margin-top: 8px;
+    font-size: 15px;
+}
+
+body.task-login #login-footer {
+    margin-top: 20px;
+    color: var(--sc-muted);
+    font-size: 12px;
+}
