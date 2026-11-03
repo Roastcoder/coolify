@@ -38,7 +38,13 @@ automatic HTTPS, multiple servers over SSH, teams and an API. On top of that:
 On a fresh Ubuntu or Debian server (2 CPUs, 2 GB RAM, 30 GB disk or more), as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo bash
+```
+
+If your image in GitHub Packages is private, pass your GitHub token (`read:packages` scope):
+
+```bash
+GH_TOKEN="ghp_xxxx" GH_USER="Roastcoder" curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo -E bash
 ```
 
 Then open `http://<server-ip>:8000` and create the admin account. The same command switches an existing

@@ -4,14 +4,20 @@ A self-hosted deploy platform built on [Coolify](https://github.com/coollabsio/c
 
 ## Install
 
-On a fresh Ubuntu or Debian server, as root:
+On a fresh Ubuntu or Debian server (or an existing Coolify server), as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo bash
 ```
 
-The same command switches an existing Coolify server to StandaloneCoders Cloud; your projects stay.
-New versions show up under **Settings > Updates** with an **Update** button.
+If your package on GitHub Container Registry (ghcr.io) is **private**, provide a Personal Access Token with `read:packages` permission:
+
+```bash
+GH_TOKEN="ghp_xxxx" GH_USER="Roastcoder" curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo -E bash
+```
+
+The same command switches an existing Coolify server to StandaloneCoders Cloud without deleting any projects or databases.
+New versions show up under **Settings > Updates** with a 1-click **Update** button.
 
 ## How this repo works
 
