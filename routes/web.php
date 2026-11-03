@@ -195,6 +195,9 @@ if (app()->environment(['local', 'testing'])) {
     })->where('code', '[0-9]{3}')->name('dev.error-preview');
 }
 
+// Fork-only: public home page.
+Route::view('/home', 'home')->name('home');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');

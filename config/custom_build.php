@@ -8,6 +8,8 @@
 
 return [
     'product_name' => env('PRODUCT_NAME', 'StandaloneCoders Cloud'),
+    // Shown on the public home page for plan enquiries.
+    'contact_email' => env('CONTACT_EMAIL', 'hello@standalonecoders.com'),
     'repository' => env('CUSTOM_BUILD_REPOSITORY', 'Roastcoder/standalonecoders-cloud'),
     'workflow' => env('CUSTOM_BUILD_WORKFLOW', 'custom-build.yml'),
     'branch' => env('CUSTOM_BUILD_BRANCH', 'main'),
