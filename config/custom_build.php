@@ -13,6 +13,7 @@ return [
     'repository' => env('CUSTOM_BUILD_REPOSITORY', 'Roastcoder/standalonecoders-cloud'),
     'workflow' => env('CUSTOM_BUILD_WORKFLOW', 'custom-build.yml'),
     'branch' => env('CUSTOM_BUILD_BRANCH', 'main'),
+    'token' => env('CUSTOM_BUILD_TOKEN', env('GITHUB_TOKEN')),
     'sha' => null,
     'update_command' => 'nohup setsid flock -n /tmp/coolify-custom-update.lock bash /data/coolify/source/update-custom.sh >> /data/coolify/source/update-custom.log 2>&1 < /dev/null &',
 ];
