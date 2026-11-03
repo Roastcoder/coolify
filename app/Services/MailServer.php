@@ -71,7 +71,7 @@ class MailServer
             // Maddy refuses to start without a certificate; a short-lived one bridges the wait for Let's Encrypt.
             "[ -f {$data}/tls/fullchain.pem ] || openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj ".escapeshellarg("/CN={$hostname}")." -keyout {$data}/tls/privkey.pem -out {$data}/tls/fullchain.pem 2>/dev/null",
             'if [ "$(docker inspect -f "{{.State.Running}}" '.self::CONTAINER.' 2>/dev/null)" = "true" ]; then docker kill -s USR2 '.self::CONTAINER.' >/dev/null; '
-                .'else docker rm -f '.self::CONTAINER.' >/dev/null 2>&1; docker run -d --name '.self::CONTAINER.' --restart unless-stopped '
+                .'else docker rm -f '.self::CONTAINER.' >/dev/null 2>&1; docker run -d --name '.self::CONTAINER.' --restart always '
                 .'-e MADDY_HOSTNAME='.escapeshellarg($hostname).' -e MADDY_DOMAIN='.escapeshellarg((string) $this->primaryDomain())." {$ports} -v {$data}:/data ".self::IMAGE.' >/dev/null; fi',
             "mkdir -p {$data}/webmail/db {$data}/webmail/config {$data}/webmail/plugins/standalonecoders_theme",
             ...$this->webmailThemeCommands(),
@@ -452,7 +452,7 @@ YAML;
         $server = escapeshellarg("ssl://{$hostname}");
 
         return "if [ \"\$(docker inspect -f '{{index .Config.Labels \"{$label}\"}}' {$name} 2>/dev/null)\" != ".escapeshellarg($labelValue).' ]; then '
-            ."docker rm -f {$name} >/dev/null 2>&1; docker run -d --name {$name} --restart unless-stopped --network coolify "
+            ."docker rm -f {$name} >/dev/null 2>&1; docker run -d --name {$name} --restart always --network coolify "
             .'--label '.escapeshellarg("{$label}={$labelValue}")
             ." -e ROUNDCUBEMAIL_DEFAULT_HOST={$server} -e ROUNDCUBEMAIL_DEFAULT_PORT=993"
             ." -e ROUNDCUBEMAIL_SMTP_SERVER={$server} -e ROUNDCUBEMAIL_SMTP_PORT=465"
