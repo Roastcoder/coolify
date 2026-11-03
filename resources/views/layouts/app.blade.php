@@ -45,7 +45,7 @@
                 :class="{ 'z-[1000]': resourceActionsOpen }"
                 class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-black/[0.06] dark:border-white/[0.06] shadow-xs">
                 {{-- Brand (width tracks sidebar) --}}
-                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-neutral-50/70 dark:border-white/[0.06] dark:bg-[#0b1222]/70 transition-[width] duration-200"
+                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-[#fcfdfe] dark:border-white/[0.06] dark:bg-[#0b1222] transition-[width] duration-200"
                     :class="collapsed ? 'w-(--sidebar-collapsed-w) justify-center px-0 border-b' : 'w-56 px-4'">
                     <div class="flex items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="StandaloneCoders"

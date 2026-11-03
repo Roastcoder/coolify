@@ -464,15 +464,120 @@ html {
     letter-spacing: 0.01em;
 }
 
-/* Polished Sidebar Nav Links */
-html .app-sidebar .menu-item {
+/* =========================================================================
+   StandaloneCoders Cloud Modern Sidepanel & Navigation Overhaul
+   ========================================================================= */
+
+/* Sidepanel Surface & Colors: clean slate/dark contrast with no legacy purple */
+html.dark:not([data-theme="custom"]) .app-sidebar nav.sidebar-nav,
+html.dark:not([data-theme="custom"]) .mobile-sidebar-sheet [role="dialog"],
+html.dark:not([data-theme="custom"]) .app-topbar-brand {
+    background-color: #0b1222 !important;
+    background-image: linear-gradient(180deg, rgba(34, 197, 94, 0.04) 0%, transparent 480px) !important;
+    border-right-color: rgba(255, 255, 255, 0.07) !important;
+    --color-nav-text: #cbd5e1;
+    --color-nav-muted: #64748b;
+    --color-nav-active: #f8fafc;
+}
+
+html:not(.dark):not([data-theme="custom"]) .app-sidebar nav.sidebar-nav,
+html:not(.dark):not([data-theme="custom"]) .mobile-sidebar-sheet [role="dialog"],
+html:not(.dark):not([data-theme="custom"]) .app-topbar-brand {
+    background-color: #ffffff !important;
+    background-image: linear-gradient(180deg, rgba(34, 197, 94, 0.02) 0%, transparent 480px) !important;
+    border-right-color: rgba(0, 0, 0, 0.07) !important;
+    --color-nav-text: #475569;
+    --color-nav-muted: #64748b;
+    --color-nav-active: #0f172a;
+}
+
+/* Sidebar Search Pill */
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: none !important;
+    color: #94a3b8 !important;
+    border-radius: 0.75rem !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search:hover {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(34, 197, 94, 0.35) !important;
+    color: #f8fafc !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .menu-search kbd {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #cbd5e1 !important;
+}
+
+/* Sidebar Menu Items */
+html :is(.app-sidebar, .mobile-sidebar-sheet) .menu-item {
     border-radius: 0.625rem;
     font-size: 13px;
     font-weight: 500;
-    transition: all 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: all 150ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-html .sidebar-nav .nav-section {
+html :is(.app-sidebar, .mobile-sidebar-sheet) .menu-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+}
+
+/* Sidebar Menu Item Icon Tiles */
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon,
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) .app-sidebar nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #94a3b8 !important;
+}
+
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):hover:not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon {
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: #f8fafc !important;
+}
+
+/* Active Menu Item & Subitem */
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+    background: rgba(34, 197, 94, 0.12) !important;
+    color: #4ade80 !important;
+    font-weight: 600 !important;
+    border-left: 3px solid #22c55e !important;
+    border-radius: 0 0.5rem 0.5rem 0 !important;
+    box-shadow: 0 0 16px -4px rgba(34, 197, 94, 0.25) !important;
+}
+
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    background: rgba(34, 197, 94, 0.22) !important;
+    border-color: rgba(34, 197, 94, 0.45) !important;
+    color: #4ade80 !important;
+}
+
+html:not(.dark):not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+    background: rgba(34, 197, 94, 0.1) !important;
+    color: #15803d !important;
+    font-weight: 600 !important;
+    border-left: 3px solid #16a34a !important;
+    border-radius: 0 0.5rem 0.5rem 0 !important;
+}
+
+html:not(.dark):not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    background: rgba(34, 197, 94, 0.15) !important;
+    border-color: rgba(34, 197, 94, 0.35) !important;
+    color: #15803d !important;
+}
+
+/* Category Dividers & Section Headers */
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) .sidebar-nav :is([class~="dark:border-white/[0.06]"], [class~="dark:border-white/[0.07]"], [class~="dark:border-white/[0.08]"]) {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+html :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
     font-size: 10px !important;
     font-weight: 700 !important;
     letter-spacing: 0.08em !important;
@@ -481,20 +586,14 @@ html .sidebar-nav .nav-section {
     padding: 0.625rem 0.625rem 0.25rem !important;
 }
 
-html.dark .sidebar-nav .nav-section {
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) nav:not(.sidebar-collapsed) .nav-section {
     color: #64748b !important;
 }
 
-html .app-sidebar .menu-item-active {
-    background-color: rgba(34, 197, 94, 0.1) !important;
-    color: #15803d !important;
+/* Submenu Back Header */
+html :is(.app-sidebar, .mobile-sidebar-sheet) .menu-back {
+    border-radius: 0.625rem !important;
     font-weight: 600 !important;
 }
 
-html.dark .app-sidebar .menu-item-active {
-    background-color: rgba(34, 197, 94, 0.12) !important;
-    color: #4ade80 !important;
-    border: 1px solid rgba(34, 197, 94, 0.25);
-    box-shadow: 0 0 16px -4px rgba(34, 197, 94, 0.2);
-}
 

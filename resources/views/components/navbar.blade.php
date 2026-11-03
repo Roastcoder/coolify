@@ -1,8 +1,8 @@
 @props(['desktop' => false])
 
 <nav @class([
-    'sidebar-nav flex min-h-0 flex-col flex-1 border-r border-black/[0.06] dark:border-white/[0.04] pt-2',
-    'bg-neutral-50 dark:bg-app' => $desktop,
+    'sidebar-nav flex min-h-0 flex-col flex-1 border-r border-black/[0.06] dark:border-white/[0.06] pt-2',
+    'bg-[#fcfdfe] dark:bg-[#0b1222]' => $desktop,
     'bg-white dark:bg-panel' => ! $desktop,
 ])
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"
@@ -209,11 +209,11 @@
                         <li class="mb-1">
                             <button type="button" @click="navLevel = {{ $previousDepth }}; navSwap = 'back'"
                                 title="{{ $navMenu['backTitle'] }}" aria-label="{{ $navMenu['backTitle'] }}"
-                                class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
+                                class="menu-item menu-back group !rounded-xl !bg-neutral-100/90 hover:!bg-neutral-200/90 dark:!bg-white/[0.04] dark:hover:!bg-white/[0.08] !border !border-neutral-200/70 dark:!border-white/[0.07] !py-1.5 transition-all mb-1" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white" />
                                 </span>
-                                <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
+                                <span class="flex-1 truncate pr-2 text-center text-xs font-semibold text-neutral-800 dark:text-neutral-200"
                                     :class="collapsed && 'lg:hidden'">{{ $navMenu['label'] }}</span>
                             </button>
                         </li>
@@ -234,12 +234,12 @@
                     <ul role="list" class="flex flex-col gap-y-0.5" :class="navSwap && 'nav-swap-' + navSwap">
                         <li class="mb-1">
                             <button type="button" @click="submenu = ''; navSwap = 'back'" title="Back to the main menu" aria-label="Back to the main menu"
-                                class="menu-item menu-back bg-transparent! hover:bg-neutral-100! dark:hover:bg-white/[0.06]!" :class="collapsed && 'lg:justify-center lg:px-0'">
+                                class="menu-item menu-back group !rounded-xl !bg-neutral-100/90 hover:!bg-neutral-200/90 dark:!bg-white/[0.04] dark:hover:!bg-white/[0.08] !border !border-neutral-200/70 dark:!border-white/[0.07] !py-1.5 transition-all mb-1" :class="collapsed && 'lg:justify-center lg:px-0'">
                                 {{-- As wide as a menu icon (with its tile), so the chevron lines up with the icons below. --}}
                                 <span class="menu-back-icon flex shrink-0 items-center justify-center">
-                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-coollabs dark:text-fg-dim" />
+                                    <x-reicon name="chevron-down" class="size-3 rotate-90 text-neutral-500 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white" />
                                 </span>
-                                <span class="flex-1 truncate pr-6 text-center font-medium text-black dark:text-fg"
+                                <span class="flex-1 truncate pr-2 text-center text-xs font-semibold text-neutral-800 dark:text-neutral-200"
                                     :class="collapsed && 'lg:hidden'">{{ $submenuItem['label'] }}</span>
                             </button>
                         </li>
