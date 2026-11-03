@@ -1,7 +1,6 @@
-name: Custom - Build Coolify Image
+name: StandaloneCoders Cloud - Build Image
 
-# Builds the app into ghcr.io/<owner>/<repo>: standalonecoders-cloud from the product repo,
-# coolify from the old fork, which also copies its tags to the product image.
+# Builds the app into ghcr.io/roastcoder/standalonecoders-cloud:latest
 
 on:
   push:
@@ -24,7 +23,6 @@ env:
 
 jobs:
   build-push:
-    if: github.repository == 'Roastcoder/coolify'
     strategy:
       matrix:
         include:
@@ -94,13 +92,3 @@ jobs:
             "${IMAGE}:${GITHUB_SHA}-aarch64" \
             --tag "${IMAGE}:${GITHUB_SHA::7}" \
             --tag "${IMAGE}:latest"
-
-      # The old fork also feeds the product image, for servers set up before the rename.
-      - name: Publish StandaloneCoders Cloud tags
-        if: github.event.repository.name == 'coolify'
-        run: |
-          OLD="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/coolify"
-          NEW="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/standalonecoders-cloud"
-          docker buildx imagetools create "${OLD}:${GITHUB_SHA::7}" \
-            --tag "${NEW}:${GITHUB_SHA::7}" \
-            --tag "${NEW}:latest"
