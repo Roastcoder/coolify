@@ -76,7 +76,9 @@ it('adds a domain and starts the hidden mail container', function () {
     expect($commands)->toContain('docker run -d --name coolify-mail')
         ->and($commands)->toContain('-p 25:25')
         ->and($commands)->toContain(MailServer::IMAGE)
-        ->and($commands)->toContain('dynamic/coolify-mail.yaml');
+        ->and($commands)->toContain('dynamic/coolify-mail.yaml')
+        ->and($commands)->toContain('docker run -d --name coolify-webmail')
+        ->and($commands)->toContain(base64_encode($this->mail->proxyRoute('mail.example.com')));
 });
 
 it('rejects a malformed domain', function () {

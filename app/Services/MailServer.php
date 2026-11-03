@@ -14,6 +14,7 @@ use RuntimeException;
  * and are written to Maddy's config, mailboxes live in Maddy itself.
  * Maddy can only get certificates by DNS challenge, so Traefik gets one for the mail hostname
  * and syncCertificate() copies it into Maddy's data folder (Maddy rereads it every minute).
+ * Roundcube webmail runs as coolify-webmail and Traefik serves it on the mail hostname.
  */
 class MailServer
 {
@@ -24,6 +25,10 @@ class MailServer
     public const DATA_PATH = '/data/coolify/mail';
 
     public const PORTS = [25, 143, 465, 587, 993];
+
+    public const WEBMAIL_CONTAINER = 'coolify-webmail';
+
+    public const WEBMAIL_IMAGE = 'roundcube/roundcubemail:1.6.20-apache';
 
     public function primaryDomain(): ?string
     {
@@ -64,6 +69,9 @@ class MailServer
             'if [ "$(docker inspect -f "{{.State.Running}}" '.self::CONTAINER.' 2>/dev/null)" = "true" ]; then docker kill -s USR2 '.self::CONTAINER.' >/dev/null; '
                 .'else docker rm -f '.self::CONTAINER.' >/dev/null 2>&1; docker run -d --name '.self::CONTAINER.' --restart unless-stopped '
                 .'-e MADDY_HOSTNAME='.escapeshellarg($hostname).' -e MADDY_DOMAIN='.escapeshellarg((string) $this->primaryDomain())." {$ports} -v {$data}:/data ".self::IMAGE.' >/dev/null; fi',
+            "mkdir -p {$data}/webmail/db {$data}/webmail/config",
+            $this->writeFile("{$data}/webmail/config/branding.php", "<?php\n\$config['product_name'] = 'StandaloneCoders Mail';\n"),
+            $this->webmailCommand($hostname),
         ]);
 
         $this->syncCertificate();
@@ -71,7 +79,7 @@ class MailServer
 
     public function stop(): void
     {
-        $this->run(['docker rm -f '.self::CONTAINER.' >/dev/null 2>&1 || true']);
+        $this->run(['docker rm -f '.self::CONTAINER.' '.self::WEBMAIL_CONTAINER.' >/dev/null 2>&1 || true']);
     }
 
     /** Copies Traefik's Let's Encrypt certificate for the mail hostname. False until Traefik has one. */
@@ -309,9 +317,11 @@ imap tls://0.0.0.0:993 tcp://0.0.0.0:143 {
 CONF);
     }
 
-    /** A Traefik router whose only job is to make Traefik request a certificate for the hostname. */
+    /** Serves webmail on the mail hostname, which also makes Traefik get the certificate Maddy uses. */
     public function proxyRoute(string $hostname): string
     {
+        $webmail = self::WEBMAIL_CONTAINER;
+
         return <<<YAML
 http:
   routers:
@@ -319,11 +329,45 @@ http:
       rule: Host(`{$hostname}`)
       entryPoints:
         - https
-      service: noop@internal
+      service: coolify-webmail
       tls:
         certResolver: letsencrypt
+    coolify-mail-http:
+      rule: Host(`{$hostname}`)
+      entryPoints:
+        - http
+      middlewares:
+        - coolify-mail-https
+      service: coolify-webmail
+  middlewares:
+    coolify-mail-https:
+      redirectScheme:
+        scheme: https
+  services:
+    coolify-webmail:
+      loadBalancer:
+        servers:
+          - url: http://{$webmail}:80
 
 YAML;
+    }
+
+    /** Starts Roundcube, or recreates it when the mail hostname changed. */
+    public function webmailCommand(string $hostname): string
+    {
+        $data = self::DATA_PATH;
+        $name = self::WEBMAIL_CONTAINER;
+        $label = 'coolify.mail.hostname';
+        $server = escapeshellarg("ssl://{$hostname}");
+
+        return "if [ \"\$(docker inspect -f '{{index .Config.Labels \"{$label}\"}}' {$name} 2>/dev/null)\" != ".escapeshellarg($hostname).' ]; then '
+            ."docker rm -f {$name} >/dev/null 2>&1; docker run -d --name {$name} --restart unless-stopped --network coolify "
+            .'--label '.escapeshellarg("{$label}={$hostname}")
+            ." -e ROUNDCUBEMAIL_DEFAULT_HOST={$server} -e ROUNDCUBEMAIL_DEFAULT_PORT=993"
+            ." -e ROUNDCUBEMAIL_SMTP_SERVER={$server} -e ROUNDCUBEMAIL_SMTP_PORT=465"
+            .' -e ROUNDCUBEMAIL_DB_TYPE=sqlite -e ROUNDCUBEMAIL_SKIN=elastic'
+            ." -v {$data}/webmail/db:/var/roundcube/db -v {$data}/webmail/config:/var/roundcube/config "
+            .self::WEBMAIL_IMAGE.' >/dev/null; fi';
     }
 
     protected function host(): Server

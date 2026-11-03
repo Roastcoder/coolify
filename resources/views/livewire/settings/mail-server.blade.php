@@ -35,7 +35,8 @@
                             <p class="text-sm">{{ implode(', ', $ports) }}</p>
                         </div>
                     </div>
-                    <p class="mt-4 text-sm">Mail apps: IMAP {{ $hostname }} port 993 (SSL), SMTP {{ $hostname }} port 465 (SSL) or 587 (STARTTLS). The username is the full email address.</p>
+                    <p class="mt-4 text-sm">Webmail: <a class="underline" href="https://{{ $hostname }}" target="_blank" rel="noopener">https://{{ $hostname }}</a>. Sign in with the full email address and its password.</p>
+                    <p class="mt-2 text-sm">Mail apps: IMAP {{ $hostname }} port 993 (SSL), SMTP {{ $hostname }} port 465 (SSL) or 587 (STARTTLS). The username is the full email address.</p>
                 @endif
             </x-application.settings-section>
 
