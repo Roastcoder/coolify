@@ -24,6 +24,7 @@ env:
 
 jobs:
   build-push:
+    if: github.repository == 'Roastcoder/coolify'
     strategy:
       matrix:
         include:
