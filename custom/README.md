@@ -8,7 +8,7 @@ SMS sign-in codes and the StandaloneCoders look.
 On a fresh Ubuntu or Debian server, as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/install.sh | sudo bash
 ```
 
 The same command switches an existing Coolify server to StandaloneCoders Cloud; your projects stay.
@@ -43,9 +43,9 @@ This fork tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and
 ### Coolify server
 
 ```bash
-sudo curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/docker-compose.custom.yml \
+sudo curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/docker-compose.custom.yml \
   -o /data/coolify/source/docker-compose.custom.yml
-sudo curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/update.sh \
+sudo curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/update.sh \
   -o /data/coolify/source/update-custom.sh
 sudo bash /data/coolify/source/update-custom.sh
 ```

@@ -12,13 +12,13 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     InstanceSettings::forceCreate(['id' => 0]);
     Cache::forget(CustomUpgrade::LATEST_BUILD_CACHE_KEY);
-    config(['custom_build.repository' => 'Roastcoder/coolify', 'custom_build.workflow' => 'custom-build.yml']);
+    config(['custom_build.repository' => 'Roastcoder/standalonecoders-cloud', 'custom_build.workflow' => 'custom-build.yml']);
 });
 
 function fakeLatestBuild(?string $sha): void
 {
     Http::fake([
-        'api.github.com/repos/Roastcoder/coolify/actions/workflows/custom-build.yml/runs*' => Http::response([
+        'api.github.com/repos/Roastcoder/standalonecoders-cloud/actions/workflows/custom-build.yml/runs*' => Http::response([
             'workflow_runs' => $sha ? [['head_sha' => $sha]] : [],
         ]),
     ]);

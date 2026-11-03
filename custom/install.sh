@@ -1,11 +1,11 @@
 #!/bin/bash
 # Installs StandaloneCoders Cloud on a fresh server (run as root):
-#   curl -fsSL https://raw.githubusercontent.com/Roastcoder/coolify/main/custom/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom/install.sh | sudo bash
 # Coolify's official installer sets up Docker, the database and the compose files; this then
 # switches the app image to ours. Running it on an existing Coolify server switches that server.
 set -euo pipefail
 
-RAW="https://raw.githubusercontent.com/Roastcoder/coolify/main/custom"
+RAW="https://raw.githubusercontent.com/Roastcoder/standalonecoders-cloud/main/custom"
 SOURCE_DIR=/data/coolify/source
 
 if [ "$(id -u)" != 0 ]; then
