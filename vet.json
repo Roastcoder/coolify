@@ -680,6 +680,10 @@
             "version": "5.3.9",
             "hash": "tree-v2:e0949da9b86423ae77ef6a89f893c59bf769748d6a73ef90b6b0c35ea62e8209"
         },
+        "webklex/php-imap": {
+            "version": "6.2.0",
+            "hash": "tree-v2:3c2e2a4e66ab39309454036944c09708a4ce80807d1915f81dec248d91d426da"
+        },
         "webmozart/assert": {
             "version": "2.4.1",
             "hash": "tree-v2:7376c95163e3fc61ad793a2342e94ff787b01739b28ecce59d5acd1ce8cc691b"

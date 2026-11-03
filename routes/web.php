@@ -22,6 +22,7 @@ use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\SmsOtpLoginController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\WebmailController;
 use App\Http\Controllers\WebmailPasswordController;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
@@ -201,6 +202,15 @@ if (app()->environment(['local', 'testing'])) {
 Route::view('/home', 'home')->name('home');
 // Fork-only: Settings > Password in the webmail.
 Route::post('/webmail/password/{token}', WebmailPasswordController::class)->middleware('throttle:10,1')->name('webmail.password');
+// Fork-only: StandaloneCoders Mail.
+Route::prefix('webmail')->name('webmail.')->controller(WebmailController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/login', 'showLogin')->name('login');
+    Route::post('/login', 'login')->middleware('throttle:20,1')->name('login.submit');
+    Route::post('/logout', 'logout')->name('logout');
+    Route::post('/messages/{uid}', 'update')->whereNumber('uid')->name('messages.update');
+    Route::get('/messages/{uid}/attachments/{index}', 'attachment')->whereNumber(['uid', 'index'])->name('attachment');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {

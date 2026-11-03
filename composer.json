@@ -56,6 +56,7 @@
         "stripe/stripe-php": "^16.6.0",
         "symfony/yaml": "^8.1.8",
         "visus/cuid2": "^7.0.0",
+        "webklex/php-imap": "*",
         "yosymfony/toml": "^1.0.4",
         "zircote/swagger-php": "^6.11.0"
     },
