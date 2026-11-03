@@ -11,7 +11,10 @@
                     @if ($domains->isNotEmpty())
                         @if ($running)
                             <x-forms.button wire:click="start">Apply changes</x-forms.button>
-                            <x-forms.button wire:click="stop" wire:confirm="Stop the mail server? Mail sent to you bounces back until it runs again.">Stop</x-forms.button>
+                            <x-modal-confirmation title="Stop the mail server?" isErrorButton submitAction="stop" buttonTitle="Stop"
+                                :actions="['Mail sent to your domains bounces back until the server runs again.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Stop">
+                                <x-slot:trigger><button type="button" class="button">Stop</button></x-slot:trigger>
+                            </x-modal-confirmation>
                         @else
                             <x-forms.button wire:click="start" isHighlighted>Start</x-forms.button>
                         @endif
@@ -89,8 +92,10 @@
                     <div class="mt-6" wire:key="domain-{{ $domain->id }}">
                         <div class="mb-2 flex items-center justify-between gap-2">
                             <h4 class="font-semibold">{{ $domain->name }} @if ($loop->first)<span class="text-xs font-normal">(primary)</span>@endif</h4>
-                            <x-forms.button wire:click="removeDomain({{ $domain->id }})"
-                                wire:confirm="Remove {{ $domain->name }} and its aliases?">Remove</x-forms.button>
+                            <x-modal-confirmation title="Remove {{ $domain->name }}?" isErrorButton submitAction="removeDomain({{ $domain->id }})" buttonTitle="Remove"
+                                :actions="['The domain and its aliases are removed from the mail server.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Remove">
+                                <x-slot:trigger><button type="button" class="button">Remove</button></x-slot:trigger>
+                            </x-modal-confirmation>
                         </div>
                         <p class="mb-2 text-sm">Add these records at your DNS provider. Use the name exactly as shown; <code>@</code> means the domain itself. Reverse DNS is set at your hosting provider instead.</p>
                         <div class="overflow-x-auto">
@@ -152,10 +157,14 @@
                             <li class="flex flex-wrap items-center justify-between gap-2 py-2" wire:key="mailbox-{{ $mailbox }}">
                                 <span class="text-sm">{{ $mailbox }}</span>
                                 <div class="flex gap-2">
-                                    <x-forms.button wire:click="resetPassword('{{ $mailbox }}')"
-                                        wire:confirm="Set a new password for {{ $mailbox }}? Mail apps using the old one stop working.">New password</x-forms.button>
-                                    <x-forms.button wire:click="deleteMailbox('{{ $mailbox }}')"
-                                        wire:confirm="Delete {{ $mailbox }} and all its mail? This cannot be undone.">Delete</x-forms.button>
+                                    <x-modal-confirmation title="Set a new password for {{ $mailbox }}?" submitAction="resetPassword('{{ $mailbox }}')" buttonTitle="Set new password"
+                                :actions="['Mail apps using the old password stop working until you enter the new one.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Set new password">
+                                <x-slot:trigger><button type="button" class="button">New password</button></x-slot:trigger>
+                            </x-modal-confirmation>
+                                    <x-modal-confirmation title="Delete {{ $mailbox }}?" isErrorButton submitAction="deleteMailbox('{{ $mailbox }}')" buttonTitle="Delete"
+                                :actions="['The mailbox and all its mail are deleted. This cannot be undone.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Delete">
+                                <x-slot:trigger><button type="button" class="button">Delete</button></x-slot:trigger>
+                            </x-modal-confirmation>
                                 </div>
                             </li>
                         @empty
@@ -167,10 +176,10 @@
                 <x-application.settings-section title="Coolify's own email"
                     description="Notifications, invitations and password resets from Coolify.">
                     <x-slot:actions>
-                        <x-forms.button wire:click="useForCoolify"
-                            wire:confirm="Send Coolify's email from noreply@{{ $domains->first()->name }}? This replaces the current settings under Settings > Email.">
-                            {{ $coolifySender === 'noreply@'.$domains->first()->name ? 'Reconnect' : 'Use for Coolify\'s emails' }}
-                        </x-forms.button>
+                        <x-modal-confirmation title="Send email from noreply@{{ $domains->first()->name }}?" submitAction="useForCoolify" buttonTitle="Use this mailbox"
+                            :actions="['This replaces the current settings under Settings > Email.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Use this mailbox">
+                            <x-slot:trigger><button type="button" class="button">{{ $coolifySender === 'noreply@'.$domains->first()->name ? 'Reconnect' : 'Use for Coolify\'s emails' }}</button></x-slot:trigger>
+                        </x-modal-confirmation>
                     </x-slot:actions>
                     <p class="text-sm">
                         @if ($coolifySender)
