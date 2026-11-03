@@ -104,8 +104,8 @@ class EmailChannel
 
                 $email = mail_from_email(new Email, $settings)
                     ->to(...$recipients)
-                    ->subject($mailMessage->subject)
-                    ->html((string) $mailMessage->render());
+                    ->subject($mailMessage->subject);
+                $email->html(email_html_with_inline_logo((string) $mailMessage->render(), $email));
 
                 $mailer->send($email);
             }

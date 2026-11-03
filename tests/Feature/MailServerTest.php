@@ -12,6 +12,7 @@ use App\Services\MailServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
+use Symfony\Component\Mime\Email;
 
 uses(RefreshDatabase::class);
 
@@ -167,4 +168,13 @@ it('renders Coolify emails with the StandaloneCoders branding', function () {
         ->and($html)->toContain('StandaloneCoders')
         ->and($html)->toContain('your Email settings are correct')
         ->and($html)->not->toContain('coolify.io/docs/contact');
+});
+
+it('attaches the email logo to the email so blocked remote images do not hide it', function () {
+    $email = new Email;
+    $html = '<img src="'.rtrim(base_url(), '/').'/standalonecoders-apple-touch-icon.png">';
+
+    expect(email_html_with_inline_logo($html, $email))->toBe('<img src="cid:sc-logo">')
+        ->and($email->getAttachments())->toHaveCount(1)
+        ->and(email_html_with_inline_logo('<p>No logo</p>', new Email))->toBe('<p>No logo</p>');
 });

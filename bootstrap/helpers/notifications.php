@@ -97,7 +97,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
                 ->replyTo($email)
                 ->cc($cc)
                 ->subject($mail->subject)
-                ->html((string) $mail->render())
+                ->html(email_html_with_inline_logo((string) $mail->render(), $message->getSymfonyMessage()))
         );
     } else {
         Mail::send(
@@ -106,7 +106,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
             fn (Message $message) => mail_from_message($message, $settings)
                 ->to($email)
                 ->subject($mail->subject)
-                ->html((string) $mail->render())
+                ->html(email_html_with_inline_logo((string) $mail->render(), $message->getSymfonyMessage()))
         );
     }
 }
@@ -132,4 +132,20 @@ function set_transanctional_email_settings($settings = null)
     }
 
     return null;
+}
+
+/**
+ * Fork-only: attaches the logo of the branded email layout to the email itself and points the
+ * HTML at it, so the logo shows even when a mail app blocks images from websites.
+ */
+function email_html_with_inline_logo(string $html, Email $email): string
+{
+    $logoUrl = rtrim(base_url(), '/').'/standalonecoders-apple-touch-icon.png';
+    if (! str_contains($html, $logoUrl)) {
+        return $html;
+    }
+
+    $email->embedFromPath(public_path('standalonecoders-apple-touch-icon.png'), 'sc-logo', 'image/png');
+
+    return str_replace($logoUrl, 'cid:sc-logo', $html);
 }
