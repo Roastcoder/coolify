@@ -6,6 +6,7 @@ use App\Actions\Proxy\GetTraefikCertificates;
 use App\Models\MailAlias;
 use App\Models\MailDomain;
 use App\Models\Server;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -152,24 +153,36 @@ class MailServer
         return $value === '' ? null : $value;
     }
 
-    /** @return array<int, array{type: string, name: string, value: string, ok: ?bool}> */
+    /** @return array<int, array{type: string, purpose: string, name: string, host: string, value: string, ok: ?bool}> */
     public function dnsRecords(string $domain, bool $check = false): array
     {
         $hostname = (string) $this->hostname();
         $dkim = $this->dkimValue($domain);
 
         $records = [
-            ['type' => 'MX', 'name' => $domain, 'value' => $hostname],
-            ['type' => 'TXT', 'name' => $domain, 'value' => 'v=spf1 mx ~all'],
-            ['type' => 'TXT', 'name' => "_dmarc.{$domain}", 'value' => "v=DMARC1; p=quarantine; rua=mailto:postmaster@{$domain}"],
-            ['type' => 'TXT', 'name' => "default._domainkey.{$domain}", 'value' => $dkim ?? 'Shown after the mail server starts with this domain'],
+            ['type' => 'MX', 'purpose' => 'MX', 'name' => $domain, 'value' => $hostname],
+            ['type' => 'TXT', 'purpose' => 'SPF', 'name' => $domain, 'value' => 'v=spf1 mx ~all'],
+            ['type' => 'TXT', 'purpose' => 'DMARC', 'name' => "_dmarc.{$domain}", 'value' => "v=DMARC1; p=quarantine; rua=mailto:postmaster@{$domain}"],
+            ['type' => 'TXT', 'purpose' => 'DKIM', 'name' => "default._domainkey.{$domain}", 'value' => $dkim ?? 'Shown after the mail server starts with this domain'],
         ];
         if ($domain === $this->primaryDomain()) {
             // The Coolify host is host.docker.internal to Coolify, so use the instance's public IP.
-            array_unshift($records, ['type' => 'A', 'name' => $hostname, 'value' => (string) data_get(instanceSettings(), 'public_ipv4')]);
+            $ip = (string) data_get(instanceSettings(), 'public_ipv4');
+            array_unshift($records, ['type' => 'A', 'purpose' => 'Mail server address', 'name' => $hostname, 'value' => $ip]);
+            // Set at the hosting provider, not the DNS provider; Gmail checks it matches the A record.
+            $records[] = ['type' => 'PTR', 'purpose' => 'Reverse DNS', 'name' => $ip, 'value' => $hostname];
         }
 
-        return array_map(fn (array $record) => [...$record, 'ok' => $check ? $this->resolves($record) : null], $records);
+        return array_map(fn (array $record) => [
+            ...$record,
+            // DNS panels such as Hostinger's want the name without the domain.
+            'host' => match (true) {
+                $record['type'] === 'PTR' => 'Reverse DNS of '.$record['name'],
+                $record['name'] === $domain => '@',
+                default => Str::beforeLast($record['name'], ".{$domain}"),
+            },
+            'ok' => $check ? $this->resolves($record) : null,
+        ], $records);
     }
 
     public function aliasesFile(): string
@@ -393,6 +406,10 @@ YAML;
 
     private function resolves(array $record): bool
     {
+        if ($record['type'] === 'PTR') {
+            return rtrim(strtolower((string) @gethostbyaddr($record['name'])), '.') === strtolower($record['value']);
+        }
+
         $type = $record['type'] === 'A' ? DNS_A : ($record['type'] === 'MX' ? DNS_MX : DNS_TXT);
         $answers = @dns_get_record($record['name'], $type) ?: [];
 
@@ -402,7 +419,7 @@ YAML;
         return collect($answers)->contains(fn (array $answer) => match ($record['type']) {
             'A' => ($answer['ip'] ?? null) === $record['value'],
             'MX' => rtrim(strtolower($answer['target'] ?? ''), '.') === strtolower($record['value']),
-            default => str_contains($record['name'], '_domainkey')
+            default => $record['purpose'] === 'DKIM'
                 ? preg_replace('/\s+/', '', (string) ($answer['txt'] ?? '')) === preg_replace('/\s+/', '', $record['value'])
                 : str_starts_with((string) ($answer['txt'] ?? ''), $version),
         });

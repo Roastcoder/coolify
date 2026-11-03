@@ -33,7 +33,7 @@ class MailServer extends Component
     #[Locked]
     public array $mailboxes = [];
 
-    /** @var array<string, array<int, array{type: string, name: string, value: string, ok: ?bool}>> */
+    /** @var array<string, array<int, array{type: string, purpose: string, name: string, host: string, value: string, ok: ?bool}>> */
     #[Locked]
     public array $dns = [];
 
@@ -59,7 +59,8 @@ class MailServer extends Component
         abort_unless(isInstanceAdmin(), 403);
     }
 
-    public function refreshState(bool $checkDns = false): void
+    /** DNS is checked on every refresh so the page always shows what is still missing. */
+    public function refreshState(bool $checkDns = true): void
     {
         try {
             $server = app(Server::class);

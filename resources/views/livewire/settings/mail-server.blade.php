@@ -52,6 +52,21 @@
                 </x-application.settings-section>
             @endif
 
+            @php
+                $missingDns = collect($dns)->flatten(1)->where('ok', false);
+            @endphp
+            @if ($missingDns->isNotEmpty())
+                <div class="rounded-md border border-warning/40 bg-warning/10 p-4 text-sm" role="alert">
+                    <p class="font-semibold">{{ $missingDns->count() }} DNS {{ Str::plural('record', $missingDns->count()) }} missing, so mail may go to spam or not arrive:</p>
+                    <ul class="mt-2 list-disc pl-5">
+                        @foreach ($missingDns as $record)
+                            <li>{{ $record['purpose'] }}: {{ $record['type'] }} record <code>{{ $record['host'] }}</code></li>
+                        @endforeach
+                    </ul>
+                    <p class="mt-2">Add them below, then click Check DNS. Changes can take a few minutes to show.</p>
+                </div>
+            @endif
+
             <x-application.settings-section title="Domains">
                 <x-slot:actions>
                     @if ($domains->isNotEmpty())
@@ -73,13 +88,13 @@
                             <x-forms.button wire:click="removeDomain({{ $domain->id }})"
                                 wire:confirm="Remove {{ $domain->name }} and its aliases?">Remove</x-forms.button>
                         </div>
-                        <p class="mb-2 text-sm">Add these records at your DNS provider.</p>
+                        <p class="mb-2 text-sm">Add these records at your DNS provider. Use the name exactly as shown; <code>@</code> means the domain itself. Reverse DNS is set at your hosting provider instead.</p>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
                                 <thead>
                                     <tr>
                                         <th class="py-1 pr-3">Type</th>
-                                        <th class="py-1 pr-3">Name</th>
+                                        <th class="py-1 pr-3">Name / Host</th>
                                         <th class="py-1 pr-3">Value</th>
                                         <th class="py-1">Status</th>
                                     </tr>
@@ -88,7 +103,7 @@
                                     @foreach ($dns[$domain->name] ?? [] as $record)
                                         <tr class="align-top">
                                             <td class="py-1 pr-3">{{ $record['type'] }}</td>
-                                            <td class="py-1 pr-3 break-all">{{ $record['name'] }}</td>
+                                            <td class="py-1 pr-3 break-all" title="{{ $record['name'] }}">{{ $record['host'] }}</td>
                                             <td class="py-1 pr-3 font-mono text-xs break-all">
                                                 {{ $record['value'] }}
                                                 <x-copy-button :value="$record['value']" />
