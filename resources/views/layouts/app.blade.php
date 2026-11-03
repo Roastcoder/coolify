@@ -122,6 +122,16 @@
                         <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
                         </div>
+                        {{-- Fork-only: Developer Info in mobile sidebar footer --}}
+                        <div class="shrink-0 border-t border-neutral-200 px-4 py-2.5 text-xs text-neutral-500 dark:border-white/10 dark:text-fg-faint">
+                            <div class="flex items-center justify-between">
+                                <span class="flex items-center gap-1.5 font-medium">
+                                    <span class="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span>Dev: <a href="https://github.com/Roastcoder" target="_blank" rel="noopener" class="font-semibold text-black dark:text-white hover:underline underline-offset-2">@Roastcoder</a></span>
+                                </span>
+                                <span class="font-mono text-[10.5px] text-neutral-400 dark:text-fg-dim">StandaloneCoders</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
