@@ -6,7 +6,9 @@
 
 **Deploy apps, databases and services on your own servers, with email built in.**
 
-Built on [Coolify](https://github.com/coollabsio/coolify) and kept up to date with it every day.
+Maintained by [@Roastcoder](https://github.com/Roastcoder) &bull; Built on [Coolify](https://github.com/coollabsio/coolify) and synced daily.
+
+[GitHub Profile](https://github.com/Roastcoder) &bull; [Repository](https://github.com/Roastcoder/standalonecoders-cloud)
 
 </div>
 
@@ -18,7 +20,13 @@ automatic HTTPS, multiple servers over SSH, teams and an API. On top of that:
 - **Built-in mail server.** Add a domain, create mailboxes and aliases, and see which DNS records are still
   missing, all under **Settings > Mail server**. It runs the lightweight [Maddy](https://maddy.email) mail server
   next to the platform, with DKIM, SPF and DMARC, and a Let's Encrypt certificate shared with the proxy.
-- **Webmail** at `https://mail.<your-domain>` ([Roundcube](https://roundcube.net)), plus IMAP and SMTP for any mail app.
+- **StandaloneCoders Mail.** A native, Outlook-style webmail built right in at `https://mail.<your-domain>` (and `/webmail`):
+  - **Sign-in & Sessions:** Secure login with 30-day "Remember me" option.
+  - **Folders & Navigation:** Outlook-style Inbox, Drafts, Sent, Archive, Junk, and Trash folders with live unread counts.
+  - **Message Reader:** Sandboxed email viewing with embedded inline images, secure attachment downloads, and fast search.
+  - **Compose & Send:** Full email composition supporting `To`, expandable `Cc` and `Bcc`, and multiple file attachments.
+  - **Reply & Forward:** One-click Reply (auto-quoting the message and preserving subject threads) and Forwarding.
+  - **IMAP & SMTP:** Automatically syncs sent emails to the user's IMAP Sent folder, plus standard IMAP (port 993) and SMTP submission (ports 465/587) for native mail apps (Apple Mail, Thunderbird, Outlook, iOS/Android).
 - **Branded email.** Notifications, invitations and password resets go out from your own `noreply@` mailbox
   in a StandaloneCoders layout with your logo.
 - **SMS sign-in codes.** After a correct password, users with a mobile number get a 6-digit code by SMS.
@@ -81,6 +89,6 @@ updating turns the codes off.
 ## License and credits
 
 StandaloneCoders Cloud is a modified version of [Coolify](https://github.com/coollabsio/coolify) by coolLabs,
-released under the [Apache License 2.0](LICENSE). The mail server is [Maddy](https://github.com/foxcpp/maddy)
-(GPL-3.0) and webmail is [Roundcube](https://github.com/roundcube/roundcubemail) (GPL-3.0); both run from their
-official, unmodified images.
+maintained by [@Roastcoder](https://github.com/Roastcoder) and released under the [Apache License 2.0](LICENSE).
+The mail server is [Maddy](https://github.com/foxcpp/maddy) (GPL-3.0), running from its official, unmodified image.
+The webmail interface is StandaloneCoders Mail, built natively into the platform.

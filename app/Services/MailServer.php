@@ -370,19 +370,24 @@ imap tls://0.0.0.0:993 tcp://0.0.0.0:143 {
 CONF);
     }
 
-    /** Serves webmail on the mail hostname, which also makes Traefik get the certificate Maddy uses. */
+    /**
+     * The mail host serves StandaloneCoders Mail from this app, and only its pages: the dashboard stays on
+     * the app's own domain. The router also gets the host its certificate, which the mail server uses.
+     */
     public function proxyRoute(string $hostname): string
     {
-        $webmail = self::WEBMAIL_CONTAINER;
+        $pattern = '^https://'.preg_quote($hostname, null).'/?$';
 
         return <<<YAML
 http:
   routers:
     coolify-mail-certificate:
-      rule: Host(`{$hostname}`)
+      rule: Host(`{$hostname}`) && (Path(`/`) || PathPrefix(`/webmail`) || PathPrefix(`/build/`) || PathPrefix(`/standalonecoders-`))
       entryPoints:
         - https
-      service: coolify-webmail
+      middlewares:
+        - coolify-mail-home
+      service: coolify-mail-app
       tls:
         certResolver: letsencrypt
     coolify-mail-http:
@@ -391,16 +396,20 @@ http:
         - http
       middlewares:
         - coolify-mail-https
-      service: coolify-webmail
+      service: coolify-mail-app
   middlewares:
     coolify-mail-https:
       redirectScheme:
         scheme: https
+    coolify-mail-home:
+      redirectRegex:
+        regex: '{$pattern}'
+        replacement: 'https://{$hostname}/webmail'
   services:
-    coolify-webmail:
+    coolify-mail-app:
       loadBalancer:
         servers:
-          - url: http://{$webmail}:80
+          - url: http://coolify:8080
 
 YAML;
     }

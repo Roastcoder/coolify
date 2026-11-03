@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Webmail\Mailbox;
+use Illuminate\Http\UploadedFile;
 
 class FakeMailbox extends Mailbox
 {
@@ -42,6 +43,7 @@ class FakeMailbox extends Mailbox
             'uid' => 7, 'subject' => 'Quarterly invoice', 'from' => 'Asha Rao', 'from_email' => 'asha@example.com',
             'to' => 'info@example.com', 'cc' => '', 'date' => now()->toIso8601String(),
             'html' => '<p>Hello</p><script>alert(1)</script>',
+            'text' => 'Hello',
             'attachments' => [['index' => 0, 'name' => 'invoice.pdf', 'size' => 2048, 'mime' => 'application/pdf']],
         ];
     }
@@ -59,6 +61,11 @@ class FakeMailbox extends Mailbox
     public function move(string $folderPath, int $uid, string $targetPath): void
     {
         self::$calls[] = ['move', $folderPath, $uid, $targetPath];
+    }
+
+    public function send(array|string $to, string $subject, string $body, array|string $cc = [], array|string $bcc = [], array $attachments = []): void
+    {
+        self::$calls[] = ['send', $to, $subject, $body, $cc, $bcc, $attachments];
     }
 }
 
@@ -143,4 +150,88 @@ it('signs out and forgets the mailbox', function () {
 
     $this->post(route('webmail.logout'))->assertRedirect(route('webmail.login'));
     $this->get(route('webmail.index'))->assertRedirect(route('webmail.login'));
+});
+
+it('sends an email from webmail', function () {
+    signInToWebmail($this);
+
+    $this->post(route('webmail.send'), [
+        'to' => 'client@example.com',
+        'subject' => 'Meeting notes',
+        'body' => 'Here are the notes from our call.',
+    ])->assertRedirect(route('webmail.index'))
+        ->assertSessionHas('status', 'Message sent.');
+
+    expect(FakeMailbox::$calls)->toHaveCount(1);
+    expect(FakeMailbox::$calls[0][0])->toBe('send');
+    expect(FakeMailbox::$calls[0][1])->toBe('client@example.com');
+    expect(FakeMailbox::$calls[0][2])->toBe('Meeting notes');
+    expect(FakeMailbox::$calls[0][3])->toBe('Here are the notes from our call.');
+});
+
+it('sends an email with cc, bcc and attachments', function () {
+    signInToWebmail($this);
+
+    $file = UploadedFile::fake()->create('report.pdf', 50, 'application/pdf');
+
+    $this->post(route('webmail.send'), [
+        'to' => 'client@example.com',
+        'cc' => 'boss@example.com',
+        'bcc' => 'archive@example.com',
+        'subject' => 'Quarterly Report',
+        'body' => 'Please find attached the report.',
+        'attachments' => [$file],
+    ])->assertRedirect(route('webmail.index'))
+        ->assertSessionHas('status', 'Message sent.');
+
+    expect(FakeMailbox::$calls)->toHaveCount(1);
+    expect(FakeMailbox::$calls[0][0])->toBe('send');
+    expect(FakeMailbox::$calls[0][4])->toBe('boss@example.com');
+    expect(FakeMailbox::$calls[0][5])->toBe('archive@example.com');
+    expect(FakeMailbox::$calls[0][6])->toHaveCount(1);
+});
+
+it('requires a recipient to send an email', function () {
+    signInToWebmail($this);
+
+    $this->post(route('webmail.send'), [
+        'to' => '',
+        'subject' => 'Hello',
+        'body' => 'World',
+    ])->assertSessionHasErrors('to');
+
+    expect(FakeMailbox::$calls)->toBeEmpty();
+});
+
+it('rejects an invalid email address when sending', function () {
+    $mailbox = new Mailbox('info@example.com', 'password');
+
+    expect(fn () => $mailbox->parseAddresses('not-an-email'))
+        ->toThrow(InvalidArgumentException::class, 'Invalid email address: not-an-email');
+});
+
+it('parses multiple valid email addresses', function () {
+    $mailbox = new Mailbox('info@example.com', 'password');
+
+    $addresses = $mailbox->parseAddresses('Alice <alice@example.com>, bob@example.com, "Charlie, Jr." <charlie@example.com>');
+    expect($addresses)->toHaveCount(3);
+    expect($addresses[0]->getAddress())->toBe('alice@example.com');
+    expect($addresses[0]->getName())->toBe('Alice');
+    expect($addresses[1]->getAddress())->toBe('bob@example.com');
+    expect($addresses[2]->getAddress())->toBe('charlie@example.com');
+    expect($addresses[2]->getName())->toBe('Charlie, Jr.');
+});
+
+it('shows new message, reply and forward controls in webmail', function () {
+    signInToWebmail($this);
+
+    $this->get(route('webmail.index'))
+        ->assertOk()
+        ->assertSee('New message')
+        ->assertSee('compose-dialog');
+
+    $this->get(route('webmail.index', ['uid' => 7]))
+        ->assertOk()
+        ->assertSee('Reply')
+        ->assertSee('Forward');
 });

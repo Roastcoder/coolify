@@ -3,7 +3,15 @@
 namespace App\Services\Webmail;
 
 use App\Services\MailServer;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Symfony\Component\Mailer\Mailer;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
+use Symfony\Component\Mailer\Transport\TransportInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
 use Webklex\PHPIMAP\Folder;
@@ -130,6 +138,7 @@ class Mailbox
             'cc' => $this->addresses($message->getCc()),
             'date' => optional($message->getDate()->first())->toIso8601String(),
             'html' => $html,
+            'text' => (string) ($message->getTextBody() ?? strip_tags($message->getHTMLBody() ?? '')),
             'attachments' => $attachments
                 ->filter(fn ($attachment) => $attachment->disposition !== 'inline' || ! $attachment->id)
                 ->map(fn ($attachment, $index) => [
@@ -173,6 +182,135 @@ class Mailbox
         }
 
         $trashPath && $trashPath !== $folderPath ? $message->move($trashPath, true) : $message->delete(true);
+    }
+
+    /**
+     * Sends an email via SMTP and copies it to the Sent folder over IMAP.
+     *
+     * @param  array<int, string>|string  $to
+     * @param  array<int, string>|string  $cc
+     * @param  array<int, string>|string  $bcc
+     * @param  array<int, UploadedFile|array{name: string, mime: string, content: string}>  $attachments
+     */
+    public function send(
+        array|string $to,
+        string $subject,
+        string $body,
+        array|string $cc = [],
+        array|string $bcc = [],
+        array $attachments = []
+    ): void {
+        $toAddresses = $this->parseAddresses($to);
+        if (empty($toAddresses)) {
+            throw new InvalidArgumentException('Please specify at least one recipient.');
+        }
+
+        $email = (new Email)
+            ->from($this->email)
+            ->subject($subject !== '' ? $subject : '(no subject)');
+
+        foreach ($toAddresses as $address) {
+            $email->addTo($address);
+        }
+        foreach ($this->parseAddresses($cc) as $address) {
+            $email->addCc($address);
+        }
+        foreach ($this->parseAddresses($bcc) as $address) {
+            $email->addBcc($address);
+        }
+
+        $email->text($body);
+        if (strip_tags($body) !== $body) {
+            $email->html($body);
+        } else {
+            $email->html(nl2br(e($body)));
+        }
+
+        foreach ($attachments as $attachment) {
+            if ($attachment instanceof UploadedFile) {
+                $email->attachFromPath(
+                    $attachment->getRealPath(),
+                    $attachment->getClientOriginalName(),
+                    $attachment->getClientMimeType()
+                );
+            } elseif (is_array($attachment) && isset($attachment['content'])) {
+                $email->attach(
+                    $attachment['content'],
+                    $attachment['name'] ?? 'attachment',
+                    $attachment['mime'] ?? 'application/octet-stream'
+                );
+            }
+        }
+
+        $this->mailer()->send($email);
+
+        $this->saveToSentFolder($email);
+    }
+
+    /**
+     * @param  array<int, string>|string  $addresses
+     * @return array<int, Address>
+     */
+    public function parseAddresses(array|string $addresses): array
+    {
+        if (is_array($addresses)) {
+            $strings = $addresses;
+        } else {
+            $strings = str_getcsv($addresses, ',', '"', '\\');
+        }
+
+        $parsed = [];
+        foreach ($strings as $item) {
+            $item = trim((string) $item);
+            if ($item === '') {
+                continue;
+            }
+            try {
+                $parsed[] = Address::create($item);
+            } catch (\Throwable) {
+                throw new InvalidArgumentException("Invalid email address: {$item}");
+            }
+        }
+
+        return $parsed;
+    }
+
+    protected function saveToSentFolder(Email $email): void
+    {
+        try {
+            $folders = $this->folders();
+            $sentPath = collect($folders)->firstWhere('role', 'sent')['path'] ?? null;
+            if (! $sentPath) {
+                $paths = array_column($folders, 'path');
+                foreach (['Sent', 'INBOX.Sent', 'Sent Items', 'Sent Messages'] as $candidate) {
+                    if (in_array($candidate, $paths, true)) {
+                        $sentPath = $candidate;
+                        break;
+                    }
+                }
+            }
+
+            if ($sentPath) {
+                $this->folder($sentPath)->appendMessage($email->toString(), ['\\Seen']);
+            }
+        } catch (\Throwable) {
+            // Appending to Sent is non-fatal: delivery via SMTP has already succeeded.
+        }
+    }
+
+    protected function transport(): TransportInterface
+    {
+        $hostname = app(MailServer::class)->hostname() ?? 'localhost';
+        $transport = new EsmtpTransport($hostname, 465, true);
+        $transport->setUsername($this->email);
+        $transport->setPassword($this->password);
+
+        return $transport;
+    }
+
+    protected function mailer(): MailerInterface
+    {
+        return new Mailer($this->transport());
     }
 
     private function find(string $folderPath, int $uid): ?Message

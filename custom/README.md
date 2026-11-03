@@ -1,7 +1,6 @@
 # StandaloneCoders Cloud
 
-A self-hosted deploy platform built on [Coolify](https://github.com/coollabsio/coolify), with a built-in mail server,
-SMS sign-in codes and the StandaloneCoders look.
+A self-hosted deploy platform built on [Coolify](https://github.com/coollabsio/coolify), maintained by [@Roastcoder](https://github.com/Roastcoder). Features a built-in mail server with native Outlook-style webmail, SMS sign-in codes, and the StandaloneCoders look.
 
 ## Install
 
@@ -15,8 +14,6 @@ The same command switches an existing Coolify server to StandaloneCoders Cloud; 
 New versions show up under **Settings > Updates** with an **Update** button.
 
 ## How this repo works
-
-This repo tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and adds our own changes on `main`.
 
 This fork tracks [coollabsio/coolify](https://github.com/coollabsio/coolify) and adds our own changes on `main`.
 

@@ -136,6 +136,45 @@ class WebmailController extends Controller
         });
     }
 
+    public function send(Request $request): RedirectResponse
+    {
+        $mailbox = $this->mailbox($request);
+        if (! $mailbox) {
+            return redirect()->route('webmail.login');
+        }
+
+        $validated = $request->validate([
+            'to' => ['required', 'string'],
+            'cc' => ['nullable', 'string'],
+            'bcc' => ['nullable', 'string'],
+            'subject' => ['nullable', 'string', 'max:500'],
+            'body' => ['nullable', 'string'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => ['file', 'max:25600'],
+        ]);
+
+        try {
+            $mailbox->send(
+                to: $validated['to'],
+                subject: (string) ($validated['subject'] ?? ''),
+                body: (string) ($validated['body'] ?? ''),
+                cc: (string) ($validated['cc'] ?? ''),
+                bcc: (string) ($validated['bcc'] ?? ''),
+                attachments: $request->file('attachments') ?? []
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->withInput()->withErrors(['to' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors(['send' => 'Could not send message: '.$e->getMessage()]);
+        }
+
+        return redirect()->route('webmail.index', array_filter([
+            'folder' => $request->input('folder'),
+            'q' => $request->input('q'),
+            'page' => $request->input('page'),
+        ]))->with('status', 'Message sent.');
+    }
+
     public function attachment(Request $request, int $uid, int $index)
     {
         $mailbox = $this->mailbox($request);
