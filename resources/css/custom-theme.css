@@ -13,45 +13,25 @@
 
 @font-face {
     font-display: swap;
-    font-family: 'IBM Plex Sans';
+    font-family: 'Geist Sans';
     font-style: normal;
-    font-weight: 100 700;
-    src: url('../fonts/ibm-plex-sans-latin-wght-normal.woff2') format('woff2-variations');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    font-weight: 100 900;
+    src: url('../fonts/geist-sans-variable.woff2') format('woff2');
 }
 
 @font-face {
     font-display: swap;
-    font-family: 'IBM Plex Sans';
+    font-family: 'Geist Mono';
     font-style: normal;
-    font-weight: 100 700;
-    src: url('../fonts/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-
-@font-face {
-    font-display: swap;
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 100 800;
-    src: url('../fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-    font-display: swap;
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 100 800;
-    src: url('../fonts/jetbrains-mono-latin-ext-wght-normal.woff2') format('woff2-variations');
-    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    font-weight: 100 900;
+    src: url('../fonts/geist-mono-variable.woff2') format('woff2');
 }
 
 /* Theme-level tokens, both schemes. */
 :root {
-    --font-sans: 'IBM Plex Sans', 'Geist Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
     --font-geist-sans: var(--font-sans);
-    --font-mono: 'JetBrains Mono', 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', 'SFMono-Regular', Consolas, Menlo, monospace;
     --font-logs: var(--font-mono);
 
     /* 2,300+ neutral-* utilities in the views follow the slate scale. */
@@ -529,47 +509,89 @@ html.dark :is(.app-sidebar, .mobile-sidebar-sheet) .menu-item:hover {
     color: #ffffff;
 }
 
-/* Sidebar Menu Item Icon Tiles */
-html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):not(.nav-admin):not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon,
-html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) .app-sidebar nav.sidebar-collapsed .menu-search.menu-item .menu-item-icon {
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    color: #94a3b8 !important;
-}
+/* =========================================================================
+   Modern Clean Bare SVG Icons (Zero Clunky Box Tiles / No Ledge Shadows)
+   ========================================================================= */
 
-html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem):not(.sidebar-toggle):not(.menu-search):hover:not(.menu-item-active):not(.menu-subitem-active) .menu-item-icon {
-    background: rgba(255, 255, 255, 0.09) !important;
-    color: #f8fafc !important;
-}
-
-/* Active Menu Item & Subitem */
-html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
-    background: rgba(34, 197, 94, 0.12) !important;
-    color: #4ade80 !important;
-    font-weight: 600 !important;
-    border-left: 3px solid #22c55e !important;
-    border-radius: 0 0.5rem 0.5rem 0 !important;
-    box-shadow: 0 0 16px -4px rgba(34, 197, 94, 0.25) !important;
-}
-
-html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
-    background: rgba(34, 197, 94, 0.22) !important;
-    border-color: rgba(34, 197, 94, 0.45) !important;
-    color: #4ade80 !important;
-}
-
-html:not(.dark):not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
-    background: rgba(34, 197, 94, 0.1) !important;
-    color: #15803d !important;
-    font-weight: 600 !important;
-    border-left: 3px solid #16a34a !important;
-    border-radius: 0 0.5rem 0.5rem 0 !important;
-}
-
+html :is(.menu-item, .menu-subitem) .menu-item-icon,
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon,
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon,
+html:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon,
+html.dark:where(:not([data-nav-items="flat"])) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon,
+html.dark:not([data-theme="custom"]):where(:not([data-nav-items="flat"])) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item, .menu-subitem) .menu-item-icon,
+html.dark:not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon,
 html:not(.dark):not([data-theme="custom"]) :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
-    background: rgba(34, 197, 94, 0.15) !important;
-    border-color: rgba(34, 197, 94, 0.35) !important;
+    box-sizing: border-box !important;
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+    min-width: 1.125rem !important;
+    min-height: 1.125rem !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 0.75 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: currentColor !important;
+}
+
+html :is(.menu-item, .menu-subitem) .menu-item-icon svg,
+html:where(:not([data-nav-items="flat"])) :is(.menu-item, .menu-subitem):not(.sidebar-toggle) .menu-item-icon svg {
+    width: 1.125rem !important;
+    height: 1.125rem !important;
+    display: block !important;
+}
+
+html :is(.menu-item, .menu-subitem):hover .menu-item-icon {
+    opacity: 1 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Active Menu Item & Subitem: Modern Linear/Vercel Pill */
+html :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+    background-color: rgba(34, 197, 94, 0.1) !important;
     color: #15803d !important;
+    font-weight: 600 !important;
+    border-radius: 0.5rem !important;
+    border-left: none !important;
+    padding-left: 0.625rem !important;
+}
+
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) {
+    background-color: rgba(34, 197, 94, 0.14) !important;
+    color: #4ade80 !important;
+    font-weight: 600 !important;
+    border-radius: 0.5rem !important;
+    border-left: none !important;
+    padding-left: 0.625rem !important;
+    box-shadow: none !important;
+}
+
+html :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    opacity: 1 !important;
+    color: #15803d !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+html.dark :is(.app-sidebar, .mobile-sidebar-sheet) :is(.menu-item-active, .menu-subitem-active) .menu-item-icon {
+    color: #4ade80 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* User account button in sidebar footer */
+html .app-sidebar .sidebar-footer .button {
+    border-radius: 0.625rem !important;
+    box-shadow: none !important;
+    transform: none !important;
 }
 
 /* Category Dividers & Section Headers */

@@ -368,12 +368,11 @@
             </button>
         </div>
         {{-- Fork-only: Developer Info badge in sidepanel --}}
-        <div :class="collapsed ? 'hidden' : 'flex'" class="flex items-center justify-between border-t border-neutral-200/70 px-1 pt-2 text-[11px] text-neutral-500 dark:border-white/10 dark:text-fg-faint">
+        <div :class="collapsed ? 'hidden' : 'flex'" class="flex items-center border-t border-neutral-200/70 px-1 pt-2.5 text-[11px] text-neutral-500 dark:border-white/10 dark:text-fg-faint">
             <span class="flex items-center gap-1.5 font-medium">
                 <span class="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Dev: <a href="https://github.com/Roastcoder" target="_blank" rel="noopener" class="font-semibold text-black dark:text-white hover:underline underline-offset-2">@Roastcoder</a></span>
             </span>
-            <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">StandaloneCoders</span>
         </div>
     </div>
     <div x-show="collapsed && tooltip.show" x-cloak x-transition.opacity.duration.100ms
