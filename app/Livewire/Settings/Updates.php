@@ -3,9 +3,11 @@
 namespace App\Livewire\Settings;
 
 use App\Jobs\CheckForUpdatesJob;
+use App\Livewire\CustomUpgrade;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
@@ -179,17 +181,35 @@ class Updates extends Component
     public function checkManually()
     {
         $this->authorize('update', $this->settings);
+
+        Cache::forget(CustomUpgrade::LATEST_BUILD_CACHE_KEY);
+        $this->dispatch('check-custom-update');
+
+        $custom = new CustomUpgrade;
+        $custom->mount();
+        $custom->checkUpdate(fresh: true);
+
+        if ($custom->isUpdateAvailable) {
+            $this->dispatch('updateAvailable');
+            $this->dispatch('success', 'New version available!');
+
+            return;
+        }
+
         $checked = (new CheckForUpdatesJob(cdnTries: 1))->handle();
         $this->dispatch('updateAvailable');
+
         if (! $checked) {
             $this->dispatch('error', 'Could not check for updates. Try again later.');
 
             return;
         }
+
         if (instanceSettings()->new_version_available) {
             $this->dispatch('success', 'New version available!');
         } else {
-            $this->dispatch('success', 'No new version available.');
+            $current = $custom->currentSha ? substr($custom->currentSha, 0, 7) : 'latest';
+            $this->dispatch('success', "Already up to date ({$current}).");
         }
     }
 

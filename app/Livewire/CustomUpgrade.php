@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Server;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -29,6 +30,13 @@ class CustomUpgrade extends Component
     public function mount(): void
     {
         $this->currentSha = config('custom_build.sha');
+    }
+
+    #[On('check-custom-update')]
+    #[On('updateAvailable')]
+    public function refreshUpdateStatus(): void
+    {
+        $this->checkUpdate(fresh: true);
     }
 
     public function checkUpdate(bool $fresh = false): void

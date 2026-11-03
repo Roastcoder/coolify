@@ -27,8 +27,9 @@
                 <x-slot:actions>
                     <livewire:custom-upgrade :full-button="true" key="settings-upgrade" />
                     <x-forms.button type="button" wire:click="checkManually">
-                        <x-reicon name="refresh" class="size-3.5" />
-                        Check now
+                        <x-reicon name="refresh" class="size-3.5" wire:loading.remove wire:target="checkManually" />
+                        <span wire:loading.remove wire:target="checkManually">Check now</span>
+                        <span wire:loading wire:target="checkManually">Checking…</span>
                     </x-forms.button>
                 </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
