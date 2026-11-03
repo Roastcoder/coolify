@@ -49,6 +49,14 @@
                             <span>Starting update…</span>
                         </span>
                     </x-forms.button>
+                    @if (filled($currentSha) && filled($latestSha))
+                        <a href="https://github.com/{{ config('custom_build.repository') }}/commit/{{ $latestSha }}"
+                            target="_blank" rel="noopener"
+                            title="View changelog commit on GitHub"
+                            class="text-xs font-mono text-neutral-400 hover:text-black dark:hover:text-white underline underline-offset-2">
+                            {{ substr($currentSha, 0, 7) }} &rarr; {{ substr($latestSha, 0, 7) }}
+                        </a>
+                    @endif
                 @endif
             </div>
         @else
