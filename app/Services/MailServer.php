@@ -427,6 +427,8 @@ YAML;
                 ."\$config['skin_logo'] = 'plugins/standalonecoders_theme/logo.svg';\n"
                 ."\$config['plugins'][] = 'standalonecoders_theme';\n"
                 ."\$config['blankpage_url'] = 'plugins/standalonecoders_theme/blank.html';\n"
+                // Sessions last 30 days on the server; without "Remember me" the cookies still end with the browser.
+                ."\$config['session_lifetime'] = 43200;\n"
                 // Settings > Password calls Coolify, which checks the current password and updates the mailbox.
                 ."\$config['plugins'][] = 'password';\n"
                 ."\$config['password_driver'] = 'httpapi';\n"

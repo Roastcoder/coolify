@@ -1,4 +1,14 @@
-// StandaloneCoders Mail: opens and closes the account menu in the top bar.
+// StandaloneCoders Mail: the "Remember me" box on the sign-in page, and the account menu in the top bar.
+document.addEventListener('DOMContentLoaded', function () {
+    var buttons = document.querySelector('#login-form .formbuttons');
+    if (buttons && !document.querySelector('.sc-remember')) {
+        var remember = document.createElement('label');
+        remember.className = 'sc-remember';
+        remember.innerHTML = '<input type="checkbox" name="_remember" value="1"> Remember me for 30 days';
+        buttons.parentNode.insertBefore(remember, buttons);
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function () {
     var button = document.querySelector('#sc-topbar .sc-account-button');
     var menu = document.querySelector('#sc-topbar .sc-menu');
