@@ -51,6 +51,11 @@ jobs:
           if git merge --no-edit "upstream/${UPSTREAM_BRANCH}"; then
             git push origin "HEAD:${TARGET_BRANCH}"
             echo "merged=true" >> "$GITHUB_OUTPUT"
+          elif [ "$(git diff --name-only --diff-filter=U)" = "README.md" ]; then
+            # Our README replaces upstream's, so a README-only conflict always keeps ours.
+            git checkout --ours README.md && git add README.md && git commit --no-edit
+            git push origin "HEAD:${TARGET_BRANCH}"
+            echo "merged=true" >> "$GITHUB_OUTPUT"
           else
             git diff --name-only --diff-filter=U > conflicts.txt
             git merge --abort
