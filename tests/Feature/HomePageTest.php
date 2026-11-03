@@ -8,11 +8,11 @@ it('still sends guests on other pages to the login form', function () {
     $this->get('/servers')->assertRedirect(route('login'));
 });
 
-it('shows plans, the developer and the GitHub link', function () {
+it('shows the paid plans and the developer', function () {
     $this->get('/home')
         ->assertOk()
-        ->assertSee('Plans')
         ->assertSee('₹999')
         ->assertSee('About the developer')
-        ->assertSee('https://github.com/'.config('custom_build.repository'), false);
+        ->assertDontSee('Self-host')
+        ->assertDontSee('Open source');
 });
