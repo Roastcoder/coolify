@@ -237,6 +237,9 @@ it('renders a big markdown commit message as plain safe text', function () {
 
     $html = renderDeploymentMail(DeploymentSuccess::class, $this->application, $deployment, $this->team);
 
+    // The only image is the fork's logo in the email header; commit text must not add one.
+    expect(substr_count($html, '<img'))->toBe(1);
+
     expect($html)
         ->toContain('feat(checkout): rebuild payment flow')
         ->toContain('# Heading one')
@@ -253,7 +256,6 @@ it('renders a big markdown commit message as plain safe text', function () {
         ->not->toContain('THIS_TAIL_SHOULD_BE_TRUNCATED')
         ->not->toContain('href="https://evil.example.com')
         ->not->toContain('src="https://evil.example.com')
-        ->not->toContain('<img')
         ->not->toContain('<a href="https://evil')
         ->not->toContain('<h1>')
         ->not->toContain('<h2>')

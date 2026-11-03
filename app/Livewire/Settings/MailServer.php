@@ -209,6 +209,38 @@ class MailServer extends Component
         $this->applyChanges('Alias removed.');
     }
 
+    /** Makes Coolify send its own email (notifications, invites, password resets) from noreply@<primary>. */
+    public function useForCoolify(): void
+    {
+        $server = app(Server::class);
+        $email = 'noreply@'.$server->primaryDomain();
+
+        try {
+            // A fresh password nobody sees; only Coolify's SMTP settings keep it.
+            $password = Str::password(32, symbols: false);
+            in_array($email, $this->mailboxes, true)
+                ? $server->setPassword($email, $password)
+                : $server->createMailbox($email, $password);
+
+            $settings = instanceSettings();
+            $settings->update([
+                'smtp_enabled' => true,
+                'resend_enabled' => false,
+                'smtp_host' => $server->hostname(),
+                'smtp_port' => 587,
+                'smtp_encryption' => 'starttls',
+                'smtp_username' => $email,
+                'smtp_password' => $password,
+                'smtp_from_address' => $email,
+                'smtp_from_name' => $settings->smtp_from_name ?: 'StandaloneCoders',
+            ]);
+            $this->dispatch('success', "Coolify now sends email from {$email}.");
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+        $this->refreshState();
+    }
+
     public function hideRevealed(): void
     {
         $this->revealed = $this->revealedFor = null;
@@ -221,6 +253,7 @@ class MailServer extends Component
             'aliases' => MailAlias::query()->orderBy('address')->get(),
             'hostname' => app(Server::class)->hostname(),
             'ports' => Server::PORTS,
+            'coolifySender' => data_get(instanceSettings(), 'smtp_enabled') ? data_get(instanceSettings(), 'smtp_from_address') : null,
         ]);
     }
 

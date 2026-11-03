@@ -1,6 +1,3 @@
-{{ Illuminate\Mail\Markdown::parse('---') }}
+<hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
 
-Thank you,<br>
-{{ config('app.name') ?? 'Coolify' }}
-
-{{ Illuminate\Mail\Markdown::parse('[Contact Support](https://coolify.io/docs/contact)') }}
+<p style="margin:0;">Thank you,<br>{{ data_get(instanceSettings(), 'smtp_from_name') ?: 'StandaloneCoders' }}</p>

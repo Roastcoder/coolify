@@ -138,3 +138,31 @@ it('keeps non-admins out', function () {
 
     Livewire::test(MailServerPage::class)->assertRedirect(route('dashboard'));
 });
+
+it('points Coolify email at a noreply mailbox without showing its password', function () {
+    MailDomain::create(['name' => 'example.com']);
+    $this->mail->running = true;
+    $this->mail->mailboxList = ['noreply@example.com'];
+
+    Livewire::test(MailServerPage::class)
+        ->call('useForCoolify')
+        ->assertSet('revealed', null)
+        ->assertDispatched('success');
+
+    $settings = InstanceSettings::find(0);
+    expect($settings->smtp_enabled)->toBeTrue()
+        ->and($settings->smtp_host)->toBe('mail.example.com')
+        ->and($settings->smtp_port)->toBe(587)
+        ->and($settings->smtp_username)->toBe('noreply@example.com')
+        ->and($settings->smtp_password)->toHaveLength(32)
+        ->and(collect($this->mail->commands)->contains(fn ($c) => str_contains($c, "creds password 'noreply@example.com'")))->toBeTrue();
+});
+
+it('renders Coolify emails with the StandaloneCoders branding', function () {
+    $html = view('emails.test')->render();
+
+    expect($html)->toContain('standalonecoders-apple-touch-icon.png')
+        ->and($html)->toContain('StandaloneCoders')
+        ->and($html)->toContain('your Email settings are correct')
+        ->and($html)->not->toContain('coolify.io/docs/contact');
+});

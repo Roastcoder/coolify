@@ -144,6 +144,23 @@
                     </ul>
                 </x-application.settings-section>
 
+                <x-application.settings-section title="Coolify's own email"
+                    description="Notifications, invitations and password resets from Coolify.">
+                    <x-slot:actions>
+                        <x-forms.button wire:click="useForCoolify"
+                            wire:confirm="Send Coolify's email from noreply@{{ $domains->first()->name }}? This replaces the current settings under Settings > Email.">
+                            {{ $coolifySender === 'noreply@'.$domains->first()->name ? 'Reconnect' : 'Use for Coolify\'s emails' }}
+                        </x-forms.button>
+                    </x-slot:actions>
+                    <p class="text-sm">
+                        @if ($coolifySender)
+                            Coolify sends email from <strong>{{ $coolifySender }}</strong>. Send a test from Settings > Email.
+                        @else
+                            Coolify does not send email yet.
+                        @endif
+                    </p>
+                </x-application.settings-section>
+
                 <x-application.settings-section title="Aliases"
                     description="Extra addresses that deliver to a mailbox, for example postmaster@ or sales@. The mailbox can also send from them.">
                     @if ($mailboxes)
