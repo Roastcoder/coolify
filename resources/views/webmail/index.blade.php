@@ -8,19 +8,38 @@
         'trash' => 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
         null => 'M3 6h6l2 2h10v11H3z',
     ];
+    $decodeHeader = fn (?string $text) => \App\Services\Webmail\Mailbox::decodeMimeHeader($text);
     $initials = fn (string $name) => Str::upper(collect(preg_split('/[\s._@-]+/', $name, -1, PREG_SPLIT_NO_EMPTY))->take(2)->map(fn ($part) => Str::substr($part, 0, 1))->implode('')) ?: '?';
     $hue = fn (string $value) => crc32(Str::lower($value)) % 360;
-    $when = function (?string $date) {
+    $avatarUrl = fn (?string $addr) => $addr ? 'https://unavatar.io/' . urlencode(strtolower(trim($addr))) . '?fallback=false' : null;
+
+    $userTimezone = request()->cookie('sc_webmail_tz');
+    if (! $userTimezone || ! in_array($userTimezone, DateTimeZone::listIdentifiers(), true)) {
+        $userTimezone = config('app.timezone') ?: 'UTC';
+    }
+
+    $when = function (?string $date) use ($userTimezone) {
         if (! $date) {
             return '';
         }
-        $date = Carbon\Carbon::parse($date)->timezone(config('app.timezone'));
+        $d = Carbon\Carbon::parse($date)->timezone($userTimezone);
 
-        return $date->isToday() ? $date->format('H:i') : ($date->isCurrentYear() ? $date->format('j M') : $date->format('j M Y'));
+        return $d->isToday() ? $d->format('g:i A') : ($d->isCurrentYear() ? $d->format('j M') : $d->format('j M Y'));
     };
+
+    $formatDate = function (?string $date) use ($userTimezone) {
+        if (! $date) {
+            return '';
+        }
+        return Carbon\Carbon::parse($date)->timezone($userTimezone)->format('D, j M Y, g:i A');
+    };
+
     $folderName = collect($folders)->firstWhere('path', $folder)['name'] ?? 'Inbox';
     $listUrl = fn (array $extra = []) => route('webmail.index', array_filter(['folder' => $folder, 'q' => $search ?: null, 'page' => $page > 1 ? $page : null, ...$extra]));
     $hidden = fn () => '<input type="hidden" name="folder" value="'.e($folder).'"><input type="hidden" name="q" value="'.e($search).'"><input type="hidden" name="page" value="'.e($page).'">';
+
+    $isArchiveFolder = ($role === 'archive');
+    $hasArchiveRole = collect($folders)->contains('role', 'archive');
 @endphp
 <x-webmail-layout :title="$folderName.' | StandaloneCoders Mail'">
     <div class="flex h-screen flex-col overflow-hidden bg-slate-50">
@@ -45,19 +64,35 @@
             </button>
             <details class="relative shrink-0">
                 <summary class="flex cursor-pointer list-none items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white [&::-webkit-details-marker]:hidden" aria-label="Account menu">
-                    <span class="grid size-9 place-items-center rounded-full text-sm font-semibold text-white ring-2 ring-white/30" style="background: hsl({{ $hue($email) }} 45% 38%)">{{ $initials(Str::before($email, '@')) }}</span>
+                    <div class="relative size-9 shrink-0 rounded-full overflow-hidden ring-2 ring-white/30">
+                        <span class="grid size-full place-items-center rounded-full text-sm font-semibold text-white" style="background: hsl({{ $hue($email) }} 45% 38%)">{{ $initials(Str::before($email, '@')) }}</span>
+                        @if ($avatarUrl($email))
+                            <img src="{{ $avatarUrl($email) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                        @endif
+                    </div>
                 </summary>
                 <div class="absolute right-0 z-20 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xl">
                     <div class="flex items-center gap-3 border-b border-slate-100 p-4">
-                        <span class="grid size-11 shrink-0 place-items-center rounded-full font-semibold text-white" style="background: hsl({{ $hue($email) }} 45% 38%)">{{ $initials(Str::before($email, '@')) }}</span>
-                        <div class="min-w-0">
-                            <p class="truncate font-semibold text-slate-900">{{ Str::before($email, '@') }}</p>
-                            <p class="truncate text-sm text-slate-500">{{ $email }}</p>
+                        <div class="relative size-11 shrink-0 rounded-full overflow-hidden ring-1 ring-slate-200">
+                            <span class="grid size-full place-items-center rounded-full font-semibold text-white" style="background: hsl({{ $hue($email) }} 45% 38%)">{{ $initials(Str::before($email, '@')) }}</span>
+                            @if ($avatarUrl($email))
+                                <img src="{{ $avatarUrl($email) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                            @endif
                         </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-semibold text-slate-900">{{ Str::before($email, '@') }}</p>
+                            <p class="truncate text-xs text-slate-500">{{ $email }}</p>
+                        </div>
+                    </div>
+                    <div class="p-1 border-b border-slate-100">
+                        <button type="button" onclick="openAccountSettings()" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-green-800 transition">
+                            <svg viewBox="0 0 24 24" class="size-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+                            <span>Account Settings & Password</span>
+                        </button>
                     </div>
                     <form method="POST" action="{{ route('webmail.logout') }}">
                         @csrf
-                        <button type="submit" class="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50">Sign out</button>
+                        <button type="submit" class="w-full px-4 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50">Sign out</button>
                     </form>
                 </div>
             </details>
@@ -114,18 +149,27 @@
                 @endif
                 <ul class="min-h-0 flex-1 overflow-y-auto">
                     @forelse ($messages as $item)
-                        @php $selected = $message && $message['uid'] === $item['uid']; @endphp
+                        @php
+                            $selected = $message && $message['uid'] === $item['uid'];
+                            $decodedFrom = $decodeHeader($item['from']);
+                            $decodedSubject = $decodeHeader($item['subject']);
+                        @endphp
                         <li>
                             <a href="{{ $listUrl(['uid' => $item['uid']]) }}" @if ($selected) aria-current="true" @endif
                                 class="flex gap-3 border-b border-l-[3px] border-b-slate-100 px-4 py-3 {{ $selected ? 'border-l-green-600 bg-green-50' : ($item['seen'] ? 'border-l-transparent hover:bg-slate-50' : 'border-l-green-500 hover:bg-slate-50') }}">
-                                <span class="grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold text-white" style="background: hsl({{ $hue($item['from_email'] ?: $item['from']) }} 45% 42%)" aria-hidden="true">{{ $initials($item['from']) }}</span>
+                                <div class="relative size-9 shrink-0 rounded-full overflow-hidden">
+                                    <span class="grid size-full place-items-center rounded-full text-xs font-semibold text-white" style="background: hsl({{ $hue($item['from_email'] ?: $item['from']) }} 45% 42%)" aria-hidden="true">{{ $initials($decodedFrom) }}</span>
+                                    @if ($item['from_email'] && $avatarUrl($item['from_email']))
+                                        <img src="{{ $avatarUrl($item['from_email']) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                                    @endif
+                                </div>
                                 <span class="min-w-0 flex-1">
                                     <span class="flex items-baseline gap-2">
-                                        <span class="min-w-0 flex-1 truncate text-sm {{ $item['seen'] ? 'text-slate-700' : 'font-semibold text-slate-900' }}">{{ $item['from'] ?: '(unknown sender)' }}</span>
-                                        <span class="shrink-0 text-xs {{ $item['seen'] ? 'text-slate-500' : 'font-semibold text-green-700' }}">{{ $when($item['date']) }}</span>
+                                        <span class="min-w-0 flex-1 truncate text-sm {{ $item['seen'] ? 'text-slate-700' : 'font-semibold text-slate-900' }}">{{ $decodedFrom ?: '(unknown sender)' }}</span>
+                                        <span class="shrink-0 text-xs js-local-time {{ $item['seen'] ? 'text-slate-500' : 'font-semibold text-green-700' }}" data-utc="{{ $item['date'] }}">{{ $when($item['date']) }}</span>
                                     </span>
                                     <span class="mt-0.5 block truncate text-sm {{ $item['seen'] ? 'text-slate-600' : 'font-medium text-green-800' }}">
-                                        @unless ($item['seen'])<span class="sr-only">Unread: </span>@endunless{{ $item['subject'] }}
+                                        @unless ($item['seen'])<span class="sr-only">Unread: </span>@endunless{{ $decodedSubject }}
                                     </span>
                                 </span>
                             </a>
@@ -156,9 +200,23 @@
             {{-- Reader --}}
             <main class="{{ $message ? 'flex' : 'hidden lg:flex' }} min-w-0 flex-1 flex-col bg-white lg:bg-slate-50">
                 @if ($message)
+                    @php
+                        $msgSubject = $decodeHeader($message['subject']);
+                        $msgFrom = $decodeHeader($message['from']);
+                        $msgTo = $decodeHeader($message['to']);
+                        $msgCc = $decodeHeader($message['cc']);
+                        $actionButtons = [];
+                        if ($isArchiveFolder) {
+                            $actionButtons[] = ['unarchive', 'Move to Inbox', 'M4 13h4l2 3h4l2-3h4M5 5h14l1 8v5a1 1 0 01-1 1H5a1 1 0 01-1-1v-5l1-8z'];
+                        } elseif ($hasArchiveRole) {
+                            $actionButtons[] = ['archive', 'Archive', 'M4 5h16v4H4zM5 9v10h14V9M10 13h4'];
+                        }
+                        $actionButtons[] = ['delete', $role === 'trash' ? 'Delete forever' : 'Delete', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'];
+                        $actionButtons[] = ['unread', 'Mark unread', 'M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z'];
+                    @endphp
                     <div class="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-2 py-1.5">
                         <a href="{{ $listUrl() }}" class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 lg:hidden">&larr; Back</a>
-                        <button type="button" onclick="replyToCurrentMessage()" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                        <button type="button" onclick="focusInlineReply()" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                             <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v2.5" /></svg>
                             Reply
                         </button>
@@ -166,12 +224,12 @@
                             <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v2.5" /></svg>
                             Forward
                         </button>
-                        @foreach (array_filter([$role !== 'archive' && collect($folders)->contains('role', 'archive') ? ['archive', 'Archive', 'M4 5h16v4H4zM5 9v10h14V9M10 13h4'] : null, ['delete', $role === 'trash' ? 'Delete forever' : 'Delete', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'], ['unread', 'Mark unread', 'M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z']]) as [$action, $label, $path])
+                        @foreach ($actionButtons as [$action, $label, $path])
                             <form method="POST" action="{{ route('webmail.messages.update', $message['uid']) }}">
                                 @csrf
                                 {!! $hidden() !!}
                                 <input type="hidden" name="action" value="{{ $action }}">
-                                <button type="submit" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium {{ $action === 'delete' ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100' }}">
+                                <button type="submit" class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium {{ $action === 'delete' ? 'text-red-600 hover:bg-red-50' : ($action === 'unarchive' ? 'text-green-700 hover:bg-green-50 font-semibold' : 'text-slate-700 hover:bg-slate-100') }}">
                                     <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ $path }}" /></svg>
                                     {{ $label }}
                                 </button>
@@ -179,23 +237,28 @@
                         @endforeach
                     </div>
                     <article class="flex min-h-0 flex-1 flex-col lg:m-3 lg:overflow-hidden lg:rounded-xl lg:border lg:border-slate-200 lg:bg-white lg:shadow-sm">
-                        <header class="border-b border-slate-100 px-5 py-4 sm:px-6">
-                            <h2 class="text-xl! font-semibold text-slate-900">{{ $message['subject'] }}</h2>
+                        <header class="border-b border-slate-100 px-5 py-4 sm:px-6 shrink-0">
+                            <h2 class="text-xl! font-semibold text-slate-900">{{ $msgSubject }}</h2>
                             <div class="mt-4 flex items-start gap-3">
-                                <span class="grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white" style="background: hsl({{ $hue($message['from_email'] ?: $message['from']) }} 45% 42%)" aria-hidden="true">{{ $initials($message['from']) }}</span>
+                                <div class="relative size-10 shrink-0 rounded-full overflow-hidden">
+                                    <span class="grid size-full place-items-center rounded-full text-sm font-semibold text-white" style="background: hsl({{ $hue($message['from_email'] ?: $message['from']) }} 45% 42%)" aria-hidden="true">{{ $initials($msgFrom) }}</span>
+                                    @if ($message['from_email'] && $avatarUrl($message['from_email']))
+                                        <img src="{{ $avatarUrl($message['from_email']) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                                    @endif
+                                </div>
                                 <div class="min-w-0 flex-1 text-sm">
                                     <div class="flex flex-wrap items-baseline gap-x-2">
-                                        <span class="font-semibold text-slate-900">{{ $message['from'] }}</span>
-                                        @if ($message['from_email'] && $message['from_email'] !== $message['from'])
+                                        <span class="font-semibold text-slate-900">{{ $msgFrom }}</span>
+                                        @if ($message['from_email'] && $message['from_email'] !== $msgFrom)
                                             <span class="text-slate-500">&lt;{{ $message['from_email'] }}&gt;</span>
                                         @endif
-                                        <span class="ml-auto text-xs text-slate-500">{{ $message['date'] ? Carbon\Carbon::parse($message['date'])->timezone(config('app.timezone'))->format('D j M Y, H:i') : '' }}</span>
+                                        <span class="ml-auto text-xs text-slate-500 js-local-datetime" data-utc="{{ $message['date'] }}">{{ $formatDate($message['date']) }}</span>
                                     </div>
-                                    @if ($message['to'])
-                                        <p class="mt-0.5 truncate text-slate-500">To: {{ $message['to'] }}</p>
+                                    @if ($msgTo)
+                                        <p class="mt-0.5 truncate text-slate-500">To: {{ $msgTo }}</p>
                                     @endif
-                                    @if ($message['cc'])
-                                        <p class="truncate text-slate-500">Cc: {{ $message['cc'] }}</p>
+                                    @if ($msgCc)
+                                        <p class="truncate text-slate-500">Cc: {{ $msgCc }}</p>
                                     @endif
                                 </div>
                             </div>
@@ -206,7 +269,7 @@
                                             <a href="{{ route('webmail.attachment', ['uid' => $message['uid'], 'index' => $file['index'], 'folder' => $folder]) }}"
                                                 class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-green-600 hover:bg-green-50">
                                                 <svg viewBox="0 0 24 24" class="size-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12l-8.5 8.5a5 5 0 01-7-7L14 5a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 8" /></svg>
-                                                <span class="max-w-48 truncate font-medium text-slate-800">{{ $file['name'] }}</span>
+                                                <span class="max-w-48 truncate font-medium text-slate-800">{{ $decodeHeader($file['name']) }}</span>
                                                 <span class="text-xs text-slate-500">{{ Number::fileSize($file['size']) }}</span>
                                             </a>
                                         </li>
@@ -215,8 +278,103 @@
                             @endif
                         </header>
                         {{-- No scripts, forms or same-origin access for mail content; links open in a new tab. --}}
-                        <iframe title="Message" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="min-h-[60vh] w-full flex-1 bg-white lg:min-h-0"
+                        <iframe title="Message" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="min-h-[40vh] w-full flex-1 bg-white lg:min-h-0"
                             srcdoc="{{ '<!DOCTYPE html><meta charset="utf-8"><base target="_blank"><style>body{margin:20px 24px;font:14px/1.6 ui-sans-serif,system-ui,sans-serif;color:#0f172a;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>'.$message['html'] }}"></iframe>
+
+                        {{-- Modern Inline Reply & Forward Box --}}
+                        <div id="inline-composer-box" class="border-t border-slate-200 bg-slate-50/70 p-3 sm:p-4 shrink-0 transition-all duration-200">
+                            {{-- Collapsed quick trigger bar --}}
+                            <div id="inline-reply-collapsed" class="flex items-center gap-3">
+                                <div class="relative size-8 shrink-0 rounded-full overflow-hidden ring-1 ring-slate-200">
+                                    <span class="grid size-full place-items-center rounded-full text-xs font-semibold text-white" style="background: hsl({{ $hue($email) }} 45% 38%)">
+                                        {{ $initials(Str::before($email, '@')) }}
+                                    </span>
+                                    @if ($avatarUrl($email))
+                                        <img src="{{ $avatarUrl($email) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                                    @endif
+                                </div>
+                                <button type="button" onclick="expandInlineReply('reply')" class="flex-1 rounded-full border border-slate-300 bg-white px-4 py-2 text-left text-xs sm:text-sm text-slate-500 shadow-2xs hover:border-slate-400 hover:bg-slate-50 focus:outline-hidden focus:ring-2 focus:ring-green-600 focus:border-green-600 transition">
+                                    Reply to {{ $msgFrom }}...
+                                </button>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button type="button" onclick="expandInlineReply('reply')" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-green-700">
+                                        <svg viewBox="0 0 24 24" class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v2.5" /></svg>
+                                        <span>Reply</span>
+                                    </button>
+                                    <button type="button" onclick="expandInlineReply('forward')" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-green-700">
+                                        <svg viewBox="0 0 24 24" class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v2.5" /></svg>
+                                        <span>Forward</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Expanded inline form --}}
+                            <form id="inline-reply-expanded" method="POST" action="{{ route('webmail.send') }}" enctype="multipart/form-data" class="hidden flex-col rounded-xl border border-slate-300 bg-white shadow-xs overflow-hidden">
+                                @csrf
+                                {!! $hidden() !!}
+                                <input type="hidden" name="to" id="inline-to" value="{{ $message['from_email'] ?: $message['from'] }}">
+                                <input type="hidden" name="subject" id="inline-subject" value="{{ Str::startsWith(Str::lower($msgSubject), 're:') ? $msgSubject : 'Re: ' . $msgSubject }}">
+
+                                <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span id="inline-badge-type" class="font-semibold text-slate-900">Reply to</span>
+                                        <span id="inline-recipient-label" class="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-2 py-0.5 font-medium text-slate-800">
+                                            {{ $msgFrom }} &lt;{{ $message['from_email'] ?: $message['from'] }}&gt;
+                                        </span>
+                                        <button type="button" onclick="toggleInlineCc()" class="font-medium text-slate-500 hover:text-green-700 ml-1">Cc / Bcc</button>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <button type="button" onclick="popOutInlineReply()" class="rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" title="Open in window" aria-label="Pop out">
+                                            <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                                        </button>
+                                        <button type="button" onclick="collapseInlineReply()" class="rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" title="Discard" aria-label="Close">
+                                            <svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="inline-cc-row" class="hidden border-b border-slate-100 px-4 py-2 space-y-1.5 bg-slate-50/40 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-10 text-slate-400 font-semibold uppercase">Cc:</span>
+                                        <input type="text" name="cc" id="inline-cc" placeholder="cc@example.com" class="flex-1 border-0 bg-transparent py-0.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-0">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-10 text-slate-400 font-semibold uppercase">Bcc:</span>
+                                        <input type="text" name="bcc" id="inline-bcc" placeholder="bcc@example.com" class="flex-1 border-0 bg-transparent py-0.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-0">
+                                    </div>
+                                </div>
+
+                                <div class="p-3 sm:p-4">
+                                    <textarea id="inline-body" name="body" rows="4" placeholder="Write your reply..."
+                                        class="w-full resize-y border-0 p-0 text-sm leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:ring-0"></textarea>
+
+                                    <details id="inline-quote-details" class="mt-3 group border-t border-slate-100 pt-2 text-xs text-slate-500">
+                                        <summary class="cursor-pointer list-none inline-flex items-center gap-1.5 text-slate-400 hover:text-slate-600 [&::-webkit-details-marker]:hidden">
+                                            <span class="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 font-bold tracking-widest text-slate-500 group-open:bg-slate-200">···</span>
+                                            <span class="text-xs">Quoted text</span>
+                                        </summary>
+                                        <div class="mt-2 pl-3 border-l-2 border-slate-200 text-slate-500 whitespace-pre-wrap font-sans text-xs" id="inline-quote-preview"></div>
+                                    </details>
+                                </div>
+
+                                <div id="inline-attachments-preview" class="hidden px-4 py-2 border-t border-slate-100 bg-slate-50 text-xs text-slate-600 flex flex-wrap gap-2"></div>
+
+                                <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                                    <div class="flex items-center gap-2">
+                                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-green-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-green-600">
+                                            <svg viewBox="0 0 24 24" class="size-3.5 -rotate-45" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                                            <span>Send</span>
+                                        </button>
+                                        <label for="inline-attachments" class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                                            <svg viewBox="0 0 24 24" class="size-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12l-8.5 8.5a5 5 0 01-7-7L14 5a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 8" /></svg>
+                                            <span>Attach files</span>
+                                            <input type="file" id="inline-attachments" name="attachments[]" multiple class="sr-only" onchange="handleInlineFilesSelected(this)">
+                                        </label>
+                                    </div>
+                                    <button type="button" onclick="collapseInlineReply()" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200/60">Discard</button>
+                                </div>
+                            </form>
+                        </div>
                     </article>
                 @else
                     <div class="m-auto max-w-xs text-center">
@@ -229,7 +387,94 @@
         </div>
     </div>
 
-    {{-- Compose dialog --}}
+    {{-- Account Settings & Password Dialog --}}
+    <dialog id="account-settings-dialog"
+        class="fixed inset-0 m-auto z-50 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-xs open:flex open:flex-col overflow-hidden text-slate-700">
+        <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3.5 shrink-0">
+            <h3 class="text-base font-semibold text-slate-900">Account Settings</h3>
+            <button type="button" onclick="closeAccountSettings()" class="rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 focus:outline-hidden" aria-label="Close dialog">
+                <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-5 space-y-6">
+            {{-- Profile Picture Section --}}
+            <div class="space-y-3">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Profile Picture</h4>
+                <div class="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50 p-3.5">
+                    <div class="relative size-14 shrink-0 rounded-full overflow-hidden ring-2 ring-white shadow-xs">
+                        <span class="grid size-full place-items-center rounded-full text-base font-bold text-white" style="background: hsl({{ $hue($email) }} 45% 38%)">
+                            {{ $initials(Str::before($email, '@')) }}
+                        </span>
+                        @if ($avatarUrl($email))
+                            <img src="{{ $avatarUrl($email) }}" alt="" class="absolute inset-0 size-full rounded-full object-cover opacity-0 transition-opacity duration-150" loading="lazy" onload="this.classList.remove('opacity-0')" onerror="this.remove()">
+                        @endif
+                    </div>
+                    <div class="min-w-0 flex-1 text-xs text-slate-600 space-y-1">
+                        <p class="font-medium text-slate-900">{{ $email }}</p>
+                        <p class="text-slate-500 leading-relaxed">
+                            Profile pictures are automatically resolved via Google Account & Gravatar for your email address.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <a href="https://gravatar.com/emails" target="_blank" rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-green-700">
+                        <span>Update photo on Gravatar</span>
+                        <svg viewBox="0 0 24 24" class="size-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" /></svg>
+                    </a>
+                    @if (auth()->check())
+                        <a href="{{ route('profile') }}" target="_blank"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-green-700">
+                            <span>Coolify Profile</span>
+                            <svg viewBox="0 0 24 24" class="size-3 text-slate-400" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" /></svg>
+                        </a>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Change Password Section --}}
+            <div class="border-t border-slate-200 pt-5 space-y-3">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Change Mailbox Password</h4>
+
+                <form method="POST" action="{{ route('webmail.password.change') }}" class="space-y-3">
+                    @csrf
+                    <div>
+                        <label for="current_password" class="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" required autocomplete="current-password"
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600">
+                        @error('current_password')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-xs font-medium text-slate-700 mb-1">New Password (min 10 characters)</label>
+                        <input type="password" id="password" name="password" minlength="10" required autocomplete="new-password"
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600">
+                        @error('password')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="password_confirmation" class="block text-xs font-medium text-slate-700 mb-1">Confirm New Password</label>
+                        <input type="password" id="password_confirmation" name="password_confirmation" minlength="10" required autocomplete="new-password"
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600">
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit"
+                            class="rounded-lg bg-green-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-green-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-green-600">
+                            Update Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    {{-- Compose Modal Dialog (For New Message & Popouts) --}}
     <dialog id="compose-dialog"
         class="fixed inset-0 m-auto z-50 w-full max-w-2xl max-h-[90vh] rounded-2xl border border-slate-200 bg-white p-0 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-xs open:flex open:flex-col overflow-hidden text-slate-700">
         <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3 shrink-0">
@@ -314,17 +559,178 @@
     </dialog>
 
     <script>
+        // Automatic Timezone detection & local time formatting
+        (function() {
+            try {
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (tz && !document.cookie.includes('sc_webmail_tz=' + encodeURIComponent(tz))) {
+                    document.cookie = 'sc_webmail_tz=' + encodeURIComponent(tz) + ';path=/;max-age=31536000;SameSite=Lax';
+                }
+            } catch (e) {}
+        })();
+
+        function formatLocalTimes() {
+            const timeEls = document.querySelectorAll('.js-local-time[data-utc]');
+            const now = new Date();
+            timeEls.forEach(el => {
+                const utc = el.getAttribute('data-utc');
+                if (!utc) return;
+                const d = new Date(utc);
+                if (isNaN(d.getTime())) return;
+
+                const isToday = d.toDateString() === now.toDateString();
+                const isCurrentYear = d.getFullYear() === now.getFullYear();
+
+                if (isToday) {
+                    el.textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                } else if (isCurrentYear) {
+                    el.textContent = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                } else {
+                    el.textContent = d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+                }
+            });
+
+            const dtEls = document.querySelectorAll('.js-local-datetime[data-utc]');
+            dtEls.forEach(el => {
+                const utc = el.getAttribute('data-utc');
+                if (!utc) return;
+                const d = new Date(utc);
+                if (isNaN(d.getTime())) return;
+                const datePart = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                const timePart = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                el.textContent = `${datePart}, ${timePart}`;
+            });
+
+            if (window.currentMessage && window.currentMessage.rawDate) {
+                const d = new Date(window.currentMessage.rawDate);
+                if (!isNaN(d.getTime())) {
+                    const datePart = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                    const timePart = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                    window.currentMessage.date = `${datePart}, ${timePart}`;
+                }
+            }
+        }
+
         @if ($message)
             window.currentMessage = {!! json_encode([
-                'subject' => $message['subject'],
-                'from' => $message['from'],
+                'subject' => \App\Services\Webmail\Mailbox::decodeMimeHeader($message['subject']),
+                'from' => \App\Services\Webmail\Mailbox::decodeMimeHeader($message['from']),
                 'from_email' => $message['from_email'],
-                'to' => $message['to'],
-                'date' => $message['date'] ? Carbon\Carbon::parse($message['date'])->timezone(config('app.timezone'))->format('D, j M Y H:i') : '',
+                'to' => \App\Services\Webmail\Mailbox::decodeMimeHeader($message['to']),
+                'rawDate' => $message['date'],
+                'date' => $message['date'] ? Carbon\Carbon::parse($message['date'])->timezone($userTimezone)->format('D, j M Y, g:i A') : '',
                 'text' => $message['text'] ?? '',
             ]) !!};
         @endif
 
+        // Inline Reply / Forward logic
+        function expandInlineReply(mode = 'reply') {
+            const collapsed = document.getElementById('inline-reply-collapsed');
+            const expanded = document.getElementById('inline-reply-expanded');
+            if (!collapsed || !expanded || !window.currentMessage) return;
+
+            const msg = window.currentMessage;
+            const badgeType = document.getElementById('inline-badge-type');
+            const recipientLabel = document.getElementById('inline-recipient-label');
+            const toInput = document.getElementById('inline-to');
+            const subjectInput = document.getElementById('inline-subject');
+            const bodyInput = document.getElementById('inline-body');
+            const quotePreview = document.getElementById('inline-quote-preview');
+
+            if (mode === 'reply') {
+                badgeType.textContent = 'Reply to';
+                const replyTo = msg.from_email || msg.from;
+                recipientLabel.textContent = `${msg.from} <${replyTo}>`;
+                toInput.value = replyTo;
+                subjectInput.value = msg.subject.toLowerCase().startsWith('re:') ? msg.subject : `Re: ${msg.subject}`;
+                quotePreview.textContent = `On ${msg.date}, ${msg.from} wrote:\n` + (msg.text || '').split('\n').map(l => `> ${l}`).join('\n');
+            } else {
+                badgeType.textContent = 'Forward';
+                recipientLabel.innerHTML = '<input type="text" id="inline-forward-to" placeholder="recipient@example.com" class="border-0 bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-hidden py-0" oninput="document.getElementById(\'inline-to\').value = this.value">';
+                toInput.value = '';
+                subjectInput.value = msg.subject.toLowerCase().startsWith('fwd:') ? msg.subject : `Fwd: ${msg.subject}`;
+                quotePreview.textContent = `---------- Forwarded message ---------\nFrom: ${msg.from} <${msg.from_email}>\nDate: ${msg.date}\nSubject: ${msg.subject}\nTo: ${msg.to}\n\n${msg.text || ''}`;
+            }
+
+            collapsed.classList.add('hidden');
+            expanded.classList.remove('hidden');
+            expanded.classList.add('flex');
+
+            const fwdInput = document.getElementById('inline-forward-to');
+            if (fwdInput) {
+                fwdInput.focus();
+            } else {
+                bodyInput.focus();
+            }
+
+            document.getElementById('inline-composer-box')?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        function collapseInlineReply() {
+            const collapsed = document.getElementById('inline-reply-collapsed');
+            const expanded = document.getElementById('inline-reply-expanded');
+            if (!collapsed || !expanded) return;
+            expanded.classList.remove('flex');
+            expanded.classList.add('hidden');
+            collapsed.classList.remove('hidden');
+        }
+
+        function focusInlineReply() {
+            expandInlineReply('reply');
+        }
+
+        function toggleInlineCc() {
+            const row = document.getElementById('inline-cc-row');
+            if (row) row.classList.toggle('hidden');
+        }
+
+        function handleInlineFilesSelected(input) {
+            const preview = document.getElementById('inline-attachments-preview');
+            if (!preview) return;
+            preview.innerHTML = '';
+            if (!input.files || input.files.length === 0) {
+                preview.classList.add('hidden');
+                return;
+            }
+            preview.classList.remove('hidden');
+            Array.from(input.files).forEach(file => {
+                const chip = document.createElement('span');
+                chip.className = 'inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 border border-slate-200 font-medium text-slate-700';
+                chip.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+                preview.appendChild(chip);
+            });
+        }
+
+        function popOutInlineReply() {
+            if (!window.currentMessage) return;
+            const bodyVal = document.getElementById('inline-body')?.value || '';
+            const toVal = document.getElementById('inline-to')?.value || '';
+            const subjVal = document.getElementById('inline-subject')?.value || '';
+            const ccVal = document.getElementById('inline-cc')?.value || '';
+            const bccVal = document.getElementById('inline-bcc')?.value || '';
+            const quoteText = document.getElementById('inline-quote-preview')?.textContent || '';
+
+            collapseInlineReply();
+
+            openCompose({
+                to: toVal,
+                subject: subjVal,
+                cc: ccVal,
+                bcc: bccVal,
+                body: bodyVal + (quoteText ? `\n\n${quoteText}` : ''),
+                title: subjVal.startsWith('Fwd:') ? 'Forward' : 'Reply'
+            });
+        }
+
+        function forwardCurrentMessage() {
+            expandInlineReply('forward');
+        }
+
+        function replyToCurrentMessage() {
+            expandInlineReply('reply');
+        }
+
+        // Modal Compose Logic
         function openCompose(data = {}) {
             const dialog = document.getElementById('compose-dialog');
             if (!dialog) return;
@@ -396,30 +802,25 @@
             });
         }
 
-        function replyToCurrentMessage() {
-            if (!window.currentMessage) return;
-            const msg = window.currentMessage;
-            const replyTo = msg.from_email || msg.from;
-            const reSubject = msg.subject.toLowerCase().startsWith('re:') ? msg.subject : `Re: ${msg.subject}`;
-            const quotedBody = `\n\nOn ${msg.date}, ${msg.from} wrote:\n` + (msg.text || '').split('\n').map(l => `> ${l}`).join('\n');
-            openCompose({
-                to: replyTo,
-                subject: reSubject,
-                body: quotedBody,
-                title: 'Reply'
-            });
+        // Account Settings Dialog Logic
+        function openAccountSettings() {
+            const dialog = document.getElementById('account-settings-dialog');
+            if (!dialog) return;
+            if (typeof dialog.showModal === 'function') {
+                dialog.showModal();
+            } else {
+                dialog.setAttribute('open', '');
+            }
         }
 
-        function forwardCurrentMessage() {
-            if (!window.currentMessage) return;
-            const msg = window.currentMessage;
-            const fwdSubject = msg.subject.toLowerCase().startsWith('fwd:') ? msg.subject : `Fwd: ${msg.subject}`;
-            const fwdBody = `\n\n---------- Forwarded message ---------\nFrom: ${msg.from} <${msg.from_email}>\nDate: ${msg.date}\nSubject: ${msg.subject}\nTo: ${msg.to}\n\n${msg.text || ''}`;
-            openCompose({
-                subject: fwdSubject,
-                body: fwdBody,
-                title: 'Forward'
-            });
+        function closeAccountSettings() {
+            const dialog = document.getElementById('account-settings-dialog');
+            if (!dialog) return;
+            if (typeof dialog.close === 'function') {
+                dialog.close();
+            } else {
+                dialog.removeAttribute('open');
+            }
         }
 
         document.getElementById('compose-dialog')?.addEventListener('click', (e) => {
@@ -429,13 +830,23 @@
             }
         });
 
-        @if ($errors->any() || old('to') || request()->boolean('compose'))
-            document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('account-settings-dialog')?.addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            if (e.target.tagName === 'DIALOG' && (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom)) {
+                closeAccountSettings();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            formatLocalTimes();
+            @if ($errors->has('current_password') || $errors->has('password'))
+                openAccountSettings();
+            @elseif ($errors->any() || old('to') || request()->boolean('compose'))
                 openCompose();
                 @if (old('cc') || old('bcc') || request('cc') || request('bcc'))
                     toggleCcBcc(true);
                 @endif
-            });
-        @endif
+            @endif
+        });
     </script>
 </x-webmail-layout>

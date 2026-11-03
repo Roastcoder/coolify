@@ -74,6 +74,41 @@ class Mailbox
     }
 
     /**
+     * Decodes MIME-encoded header strings (RFC 2047), e.g. =?UTF-8?Q?...?= or =?UTF-8?B?...?=
+     */
+    public static function decodeMimeHeader(?string $text): string
+    {
+        if ($text === null || $text === '') {
+            return '';
+        }
+
+        if (! str_contains($text, '=?')) {
+            return trim($text);
+        }
+
+        // Try iconv_mime_decode first
+        $decoded = @iconv_mime_decode($text, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+        if ($decoded !== false && ! str_contains($decoded, '=?')) {
+            return trim($decoded);
+        }
+
+        // Fallback to mb_decode_mimeheader
+        $mbDecoded = @mb_decode_mimeheader($text);
+        if ($mbDecoded !== false && ! str_contains($mbDecoded, '=?')) {
+            return trim($mbDecoded);
+        }
+
+        if (function_exists('imap_utf8')) {
+            $imapDecoded = @imap_utf8($text);
+            if ($imapDecoded && ! str_contains($imapDecoded, '=?')) {
+                return trim($imapDecoded);
+            }
+        }
+
+        return trim($decoded !== false ? $decoded : ($mbDecoded !== false ? $mbDecoded : $text));
+    }
+
+    /**
      * Newest first, without bodies.
      *
      * @return array{total: int, items: array<int, array{uid: int, from: string, from_email: string, subject: string, date: ?string, seen: bool, flagged: bool}>}
@@ -87,12 +122,14 @@ class Mailbox
         $items = $query->limit(self::PAGE_SIZE, max(1, $page))->get()->map(function (Message $message) {
             $from = $message->getFrom()->first();
             $flags = $message->getFlags()->map(fn ($flag) => strtolower((string) $flag))->values()->all();
+            $rawPersonal = (string) ($from->personal ?? '');
+            $fromName = static::decodeMimeHeader($rawPersonal) ?: (string) ($from->mail ?? '');
 
             return [
                 'uid' => (int) $message->getUid(),
-                'from' => (string) ($from->personal ?? '') ?: (string) ($from->mail ?? ''),
+                'from' => $fromName,
                 'from_email' => (string) ($from->mail ?? ''),
-                'subject' => (string) $message->getSubject() ?: '(no subject)',
+                'subject' => static::decodeMimeHeader((string) $message->getSubject()) ?: '(no subject)',
                 'date' => optional($message->getDate()->first())->toIso8601String(),
                 'seen' => in_array('seen', $flags, true),
                 'flagged' => in_array('flagged', $flags, true),
@@ -117,6 +154,8 @@ class Mailbox
         $message->setFlag('Seen');
         $from = $message->getFrom()->first();
         $attachments = $message->getAttachments()->values();
+        $rawPersonal = (string) ($from->personal ?? '');
+        $fromName = static::decodeMimeHeader($rawPersonal) ?: (string) ($from->mail ?? '');
 
         if ($message->hasHTMLBody()) {
             $html = $message->getHTMLBody();
@@ -131,8 +170,8 @@ class Mailbox
 
         return [
             'uid' => $uid,
-            'subject' => (string) $message->getSubject() ?: '(no subject)',
-            'from' => (string) ($from->personal ?? '') ?: (string) ($from->mail ?? ''),
+            'subject' => static::decodeMimeHeader((string) $message->getSubject()) ?: '(no subject)',
+            'from' => $fromName,
             'from_email' => (string) ($from->mail ?? ''),
             'to' => $this->addresses($message->getTo()),
             'cc' => $this->addresses($message->getCc()),
@@ -143,7 +182,7 @@ class Mailbox
                 ->filter(fn ($attachment) => $attachment->disposition !== 'inline' || ! $attachment->id)
                 ->map(fn ($attachment, $index) => [
                     'index' => $index,
-                    'name' => (string) ($attachment->name ?: 'attachment'),
+                    'name' => static::decodeMimeHeader((string) ($attachment->name ?: 'attachment')),
                     'size' => (int) $attachment->size,
                     'mime' => (string) $attachment->getMimeType(),
                 ])->values()->all(),
@@ -342,7 +381,13 @@ class Mailbox
     private function addresses($attribute): string
     {
         return collect($attribute?->all() ?? [])
-            ->map(fn ($address) => $address->personal ? "{$address->personal} <{$address->mail}>" : (string) $address->mail)
+            ->map(function ($address) {
+                $personal = static::decodeMimeHeader((string) ($address->personal ?? ''));
+                $mail = (string) ($address->mail ?? '');
+
+                return $personal !== '' ? "{$personal} <{$mail}>" : $mail;
+            })
+            ->filter()
             ->implode(', ');
     }
 

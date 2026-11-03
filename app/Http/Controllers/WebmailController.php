@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\MailServer;
 use App\Services\Webmail\Mailbox;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -109,19 +110,21 @@ class WebmailController extends Controller
             return redirect()->route('webmail.login');
         }
 
-        $data = $request->validate(['action' => ['required', 'in:read,unread,archive,delete']]);
+        $data = $request->validate(['action' => ['required', 'in:read,unread,archive,unarchive,delete']]);
         $folders = $mailbox->folders();
         $folder = $this->folderPath($folders, $request->input('folder'));
         $roles = collect($folders)->pluck('path', 'role');
+        $inboxPath = $roles->get('inbox') ?: 'INBOX';
 
         match ($data['action']) {
             'read' => $mailbox->setSeen($folder, $uid, true),
             'unread' => $mailbox->setSeen($folder, $uid, false),
             'archive' => $roles->get('archive') && $mailbox->move($folder, $uid, $roles->get('archive')),
+            'unarchive' => $inboxPath && $mailbox->move($folder, $uid, $inboxPath),
             'delete' => $mailbox->delete($folder, $uid, $roles->get('trash')),
         };
 
-        // Opening a message marks it read, so "unread" goes back to the list.
+        // Opening a message marks it read, so "unread", "archive", or "unarchive" goes back to the list.
         $keep = $data['action'] === 'read' ? ['uid' => $uid] : [];
 
         return redirect()->route('webmail.index', array_filter([
@@ -131,9 +134,40 @@ class WebmailController extends Controller
             ...$keep,
         ]))->with('status', match ($data['action']) {
             'archive' => 'Archived.',
+            'unarchive' => 'Moved to Inbox.',
             'delete' => 'Deleted.',
             default => null,
         });
+    }
+
+    public function updatePassword(Request $request, MailServer $mail): RedirectResponse
+    {
+        $mailbox = $this->mailbox($request);
+        if (! $mailbox) {
+            return redirect()->route('webmail.login');
+        }
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:10', 'max:128', 'confirmed'],
+        ]);
+
+        if (! $mail->checkMailboxPassword($mailbox->email, $validated['current_password'])) {
+            return back()->withErrors(['current_password' => 'The current password you entered is incorrect.']);
+        }
+
+        $mail->setPassword($mailbox->email, $validated['password']);
+
+        $credentials = [
+            'email' => $mailbox->email,
+            'password' => $validated['password'],
+        ];
+        $request->session()->put(self::SESSION_KEY, Crypt::encryptString(json_encode($credentials)));
+        if ($request->hasCookie(self::REMEMBER_COOKIE)) {
+            Cookie::queue(Cookie::make(self::REMEMBER_COOKIE, json_encode($credentials), self::REMEMBER_MINUTES, secure: $request->isSecure(), httpOnly: true, sameSite: 'lax'));
+        }
+
+        return back()->with('status', 'Mailbox password updated successfully.');
     }
 
     public function send(Request $request): RedirectResponse

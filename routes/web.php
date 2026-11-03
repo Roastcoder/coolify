@@ -206,10 +206,10 @@ Route::post('/webmail/password/{token}', WebmailPasswordController::class)->midd
 Route::prefix('webmail')->name('webmail.')->controller(WebmailController::class)->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/compose', fn (Request $request) => redirect()->route('webmail.index', array_merge(['compose' => 1], $request->query())))->name('compose');
-    Route::get('/compose', fn (Request $request) => redirect()->route('webmail.index', array_merge(['compose' => 1], $request->query())))->name('compose');
     Route::get('/login', 'showLogin')->name('login');
     Route::post('/login', 'login')->middleware('throttle:20,1')->name('login.submit');
     Route::post('/logout', 'logout')->name('logout');
+    Route::post('/password/change', 'updatePassword')->middleware('throttle:10,1')->name('password.change');
     Route::post('/send', 'send')->middleware('throttle:30,1')->name('send');
     Route::post('/messages/{uid}', 'update')->whereNumber('uid')->name('messages.update');
     Route::get('/messages/{uid}/attachments/{index}', 'attachment')->whereNumber(['uid', 'index'])->name('attachment');

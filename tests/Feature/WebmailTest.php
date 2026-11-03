@@ -233,5 +233,37 @@ it('shows new message, reply and forward controls in webmail', function () {
     $this->get(route('webmail.index', ['uid' => 7]))
         ->assertOk()
         ->assertSee('Reply')
-        ->assertSee('Forward');
+        ->assertSee('Forward')
+        ->assertSee('inline-composer-box');
+});
+
+it('decodes MIME encoded subjects and sender headers', function () {
+    expect(Mailbox::decodeMimeHeader('=?UTF-8?Q?Re=3A_Coolify_Platform_=E2=80=93_New_Updates_and_Improvement?= =?UTF-8?Q?s?='))
+        ->toBe('Re: Coolify Platform – New Updates and Improvements');
+
+    expect(Mailbox::decodeMimeHeader('=?UTF-8?B?WW9nZW5kcmEgRmF1amRhcg==?='))
+        ->toBe('Yogendra Faujdar');
+
+    expect(Mailbox::decodeMimeHeader('Plain Subject'))
+        ->toBe('Plain Subject');
+});
+
+it('unarchives a message by moving it to the inbox', function () {
+    signInToWebmail($this);
+
+    $this->post(route('webmail.messages.update', 7), ['action' => 'unarchive', 'folder' => 'Archive'])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Moved to Inbox.');
+
+    expect(FakeMailbox::$calls)->toBe([
+        ['move', 'Archive', 7, 'INBOX'],
+    ]);
+});
+
+it('shows move to inbox unarchive button when in archive folder', function () {
+    signInToWebmail($this);
+
+    $this->get(route('webmail.index', ['folder' => 'Archive', 'uid' => 7]))
+        ->assertOk()
+        ->assertSee('Move to Inbox');
 });
