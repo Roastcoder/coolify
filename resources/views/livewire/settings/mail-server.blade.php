@@ -60,10 +60,14 @@
                     <p class="font-semibold">{{ $missingDns->count() }} DNS {{ Str::plural('record', $missingDns->count()) }} missing, so mail may go to spam or not arrive:</p>
                     <ul class="mt-2 list-disc pl-5">
                         @foreach ($missingDns as $record)
-                            <li>{{ $record['purpose'] }}: {{ $record['type'] }} record <code>{{ $record['host'] }}</code></li>
+                            @if ($record['type'] === 'PTR')
+                                <li>Reverse DNS: at your hosting provider (not your DNS provider), set the PTR of <code>{{ $record['name'] }}</code> to <code>{{ $record['value'] }}</code></li>
+                            @else
+                                <li>{{ $record['purpose'] }}: {{ $record['type'] }} record <code>{{ $record['host'] }}</code>, add it at your DNS provider</li>
+                            @endif
                         @endforeach
                     </ul>
-                    <p class="mt-2">Add them below, then click Check DNS. Changes can take a few minutes to show.</p>
+                    <p class="mt-2">The values are in the table below. Then click Check DNS; changes can take a few minutes to show.</p>
                 </div>
             @endif
 
