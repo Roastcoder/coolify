@@ -1,65 +1,71 @@
-<div x-data="{ modalOpen: false }" x-init="$wire.checkUpdate()"
-    @if ($isUpdateAvailable) title="A new build of your Coolify fork is ready" @endif>
+<div x-data="{
+        pollInterval: null,
+        wentDown: false,
+        startPolling() {
+            if (this.pollInterval) return;
+            this.pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/health', { cache: 'no-store' });
+                    if (res.ok) {
+                        if (this.wentDown) {
+                            clearInterval(this.pollInterval);
+                            window.location.reload();
+                        }
+                    } else {
+                        this.wentDown = true;
+                    }
+                } catch (e) {
+                    this.wentDown = true;
+                }
+            }, 3000);
+        }
+    }"
+    x-init="$wire.checkUpdate(); if (@js($updateStarted)) { startPolling(); }"
+    x-effect="if ($wire.updateStarted) { startPolling(); }"
+    class="inline-flex items-center gap-2"
+    @if ($isUpdateAvailable) title="Update to latest build ({{ substr($latestSha ?? '', 0, 7) }})" @endif>
+
     @if ($isUpdateAvailable || $updateStarted)
         @if ($fullButton)
-            <x-forms.button type="button" @click="modalOpen = true" isHighlighted>
-                {{ $updateStarted ? 'Updating…' : 'Update now' }}
-            </x-forms.button>
-        @else
-            <button type="button" @click="modalOpen = true"
-                aria-label="{{ $updateStarted ? 'Update in progress' : 'Update available' }}"
-                class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand/25 dark:hover:bg-brand/20">
-                {{ $updateStarted ? 'Updating' : 'Update available' }}
-            </button>
-        @endif
-
-        <template x-teleport="body">
-            <div x-show="modalOpen" x-cloak @keydown.escape.window="modalOpen = false"
-                class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4">
-                <div x-show="modalOpen" x-transition.opacity @click="modalOpen = false"
-                    class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition
-                    role="dialog" aria-modal="true" aria-labelledby="custom-upgrade-title"
-                    class="application-settings-form application-settings-section relative flex w-full flex-col lg:max-w-lg"
-                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header class="flex-nowrap!">
-                        <div class="min-w-0 flex-1">
-                            <h3 id="custom-upgrade-title" class="truncate">
-                                {{ $updateStarted ? 'Update started' : 'Update to your latest build' }}
-                            </h3>
-                            <p class="mt-0.5 font-mono text-[12px] leading-4" style="color: var(--coollabs-subtle)">
-                                {{ \Illuminate\Support\Str::limit($currentSha, 7, '') }}
-                                <span class="mx-0.5">&rarr;</span>
-                                <a href="https://github.com/{{ config('custom_build.repository') }}/commit/{{ $latestSha }}"
-                                    target="_blank" rel="noopener" class="underline underline-offset-2">
-                                    {{ \Illuminate\Support\Str::limit($latestSha, 7, '') }}</a>
-                            </p>
-                        </div>
-                        <button type="button" @click="modalOpen = false" aria-label="Close"
-                            class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                            <x-reicon name="x" class="size-4" />
-                        </button>
-                    </header>
-                    <div class="application-settings-section-body flex flex-col gap-4 text-sm">
-                        @if ($updateStarted)
-                            <p>The server is downloading the new image. Coolify restarts in about a minute, then
-                                reload this page. Your applications keep running.</p>
-                        @else
-                            <p>Installs the newest image built from
-                                <a href="https://github.com/{{ config('custom_build.repository') }}" target="_blank"
-                                    rel="noopener" class="underline underline-offset-2">{{ config('custom_build.repository') }}</a>.
-                                Only the Coolify dashboard restarts, for about a minute. Your applications keep running.</p>
-                            <div class="flex justify-end gap-2">
-                                <x-forms.button type="button" @click="modalOpen = false">Cancel</x-forms.button>
-                                <x-forms.button type="button" wire:click="update" isHighlighted>
-                                    <span wire:loading.remove wire:target="update">Update now</span>
-                                    <span wire:loading wire:target="update">Starting…</span>
-                                </x-forms.button>
-                            </div>
-                        @endif
-                    </div>
-                </div>
+            <div class="flex items-center gap-2">
+                @if ($updateStarted)
+                    <x-forms.button type="button" disabled class="cursor-wait opacity-90">
+                        <svg class="size-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Updating… auto-reloading</span>
+                    </x-forms.button>
+                @else
+                    <x-forms.button type="button" wire:click="update" isHighlighted>
+                        <span wire:loading.remove wire:target="update">
+                            Update now ({{ substr($latestSha ?? '', 0, 7) }})
+                        </span>
+                        <span wire:loading wire:target="update" class="inline-flex items-center gap-1.5">
+                            <svg class="size-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            <span>Starting update…</span>
+                        </span>
+                    </x-forms.button>
+                @endif
             </div>
-        </template>
+        @else
+            @if ($updateStarted)
+                <span class="inline-flex h-[18px] items-center gap-1 rounded-full bg-warning/15 px-2 text-[9.5px] font-semibold leading-none text-warning ring-1 ring-inset ring-warning/25 animate-pulse">
+                    <span class="size-1.5 rounded-full bg-warning"></span>
+                    <span>Updating…</span>
+                </span>
+            @else
+                <button type="button" wire:click="update"
+                    aria-label="Update available"
+                    title="Click to install update ({{ substr($latestSha ?? '', 0, 7) }})"
+                    class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand/25 dark:hover:bg-brand/20">
+                    <span wire:loading.remove wire:target="update">Update available</span>
+                    <span wire:loading wire:target="update">Starting…</span>
+                </button>
+            @endif
+        @endif
     @endif
 </div>
