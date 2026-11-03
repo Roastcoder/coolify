@@ -22,6 +22,7 @@ use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\SmsOtpLoginController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\WebmailPasswordController;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
@@ -198,6 +199,8 @@ if (app()->environment(['local', 'testing'])) {
 
 // Fork-only: public home page.
 Route::view('/home', 'home')->name('home');
+// Fork-only: Settings > Password in the webmail.
+Route::post('/webmail/password/{token}', WebmailPasswordController::class)->middleware('throttle:10,1')->name('webmail.password');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {

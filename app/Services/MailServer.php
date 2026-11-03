@@ -138,6 +138,43 @@ class MailServer
         $this->run([$this->withPassword($password, 'creds password '.escapeshellarg($email))]);
     }
 
+    /** Secret in the webmail's change-password URL, so only the webmail container can call that endpoint. */
+    public function webmailPasswordToken(): string
+    {
+        return hash_hmac('sha256', 'webmail-password', (string) config('app.key'));
+    }
+
+    /** Checks a mailbox password by signing in over IMAP, the way a mail app would. */
+    public function checkMailboxPassword(string $email, string $password): bool
+    {
+        if ($this->hostname() === null || preg_match('/[\r\n]/', $email.$password)) {
+            return false;
+        }
+
+        $socket = @stream_socket_client('ssl://'.$this->hostname().':993', $errorCode, $errorMessage, 10);
+        if (! $socket) {
+            return false;
+        }
+
+        stream_set_timeout($socket, 10);
+        fgets($socket);
+        $quote = fn (string $value): string => '"'.addcslashes($value, '"\\').'"';
+        fwrite($socket, 'a1 LOGIN '.$quote($email).' '.$quote($password)."\r\n");
+
+        $signedIn = false;
+        while (($line = fgets($socket)) !== false) {
+            if (str_starts_with($line, 'a1 ')) {
+                $signedIn = str_starts_with($line, 'a1 OK');
+                break;
+            }
+        }
+
+        fwrite($socket, "a2 LOGOUT\r\n");
+        fclose($socket);
+
+        return $signedIn;
+    }
+
     public function deleteMailbox(string $email): void
     {
         $email = escapeshellarg($email);
@@ -369,7 +406,7 @@ YAML;
     }
 
     /**
-     * Writes the StandaloneCoders Mail theme (a Roundcube plugin in resources/mail/webmail-theme) and the
+     * Writes the StandaloneCoders Mail theme (a Roundcube plugin in templates/webmail-theme) and the
      * config that turns it on. The plugin folder is mounted, so a new theme shows without a restart.
      *
      * @return array<int, string>
@@ -378,15 +415,28 @@ YAML;
     {
         $data = self::DATA_PATH;
         $plugin = "{$data}/webmail/plugins/standalonecoders_theme";
-        $source = resource_path('mail/webmail-theme');
+        $source = base_path('templates/webmail-theme');
 
         return [
             $this->writeFile("{$plugin}/standalonecoders_theme.php", file_get_contents("{$source}/standalonecoders_theme.php")),
             $this->writeFile("{$plugin}/theme.css", file_get_contents("{$source}/theme.css")),
+            $this->writeFile("{$plugin}/theme.js", file_get_contents("{$source}/theme.js")),
+            $this->writeFile("{$plugin}/blank.html", file_get_contents("{$source}/blank.html")),
             $this->writeFile("{$plugin}/logo.svg", file_get_contents(public_path('standalonecoders-mark.svg'))),
             $this->writeFile("{$data}/webmail/config/branding.php", "<?php\n\$config['product_name'] = 'StandaloneCoders Mail';\n"
                 ."\$config['skin_logo'] = 'plugins/standalonecoders_theme/logo.svg';\n"
-                ."\$config['plugins'][] = 'standalonecoders_theme';\n"),
+                ."\$config['plugins'][] = 'standalonecoders_theme';\n"
+                ."\$config['blankpage_url'] = 'plugins/standalonecoders_theme/blank.html';\n"
+                // Settings > Password calls Coolify, which checks the current password and updates the mailbox.
+                ."\$config['plugins'][] = 'password';\n"
+                ."\$config['password_driver'] = 'httpapi';\n"
+                .'$config[\'password_httpapi_url\'] = '.var_export('http://coolify:8080/webmail/password/'.$this->webmailPasswordToken(), true).";\n"
+                ."\$config['password_httpapi_method'] = 'POST';\n"
+                ."\$config['password_httpapi_var_user'] = 'email';\n"
+                ."\$config['password_httpapi_var_curpass'] = 'current_password';\n"
+                ."\$config['password_httpapi_var_newpass'] = 'password';\n"
+                ."\$config['password_httpapi_expect'] = '/^OK$/';\n"
+                ."\$config['password_minimum_length'] = 10;\n"),
         ];
     }
 

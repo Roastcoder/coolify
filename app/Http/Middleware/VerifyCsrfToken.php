@@ -13,5 +13,7 @@ class VerifyCsrfToken extends Middleware
      */
     protected $except = [
         'webhooks/*',
+        // Fork-only: called by the webmail container, guarded by its own secret.
+        'webmail/password/*',
     ];
 }

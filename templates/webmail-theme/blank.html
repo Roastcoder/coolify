@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title></title>
+<style>
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #fff; color: #64748b;
+  font: 15px/1.5 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+.icon { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 20px; background: #f0fdf4; color: #16a34a; }
+strong { color: #0f172a; font-size: 17px; font-weight: 600; }
+@media (prefers-color-scheme: dark) { body { background: #111827; color: #94a3b8; } strong { color: #f8fafc; } .icon { background: rgb(22 163 74 / 0.15); } }
+</style>
+</head>
+<body>
+  <div class="icon" aria-hidden="true">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+  </div>
+  <strong>Select a message to read it</strong>
+  <span>Nothing is selected</span>
+</body>
+</html>

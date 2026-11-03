@@ -88,34 +88,178 @@ select:focus {
 
 /* ---------- Desktop: Outlook frame (top bar, app rail, folders, list, reading pane) ---------- */
 
-html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print)::before {
-    content: '';
-    position: fixed;
-    inset: 0 0 auto 0;
-    height: 48px;
-    background: linear-gradient(90deg, var(--sc-bar), var(--sc-brand-strong));
-    z-index: 5;
+/* Top bar with brand and account menu (rendered by the plugin; desktop only). */
+#sc-topbar {
+    display: none;
 }
 
-html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print)::after {
-    content: 'StandaloneCoders Mail';
+html:is(.layout-large, .layout-normal) #sc-topbar {
     position: fixed;
-    top: 0;
-    left: 72px;
+    inset: 0 0 auto 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
     height: 48px;
-    line-height: 48px;
+    padding: 0 12px 0 18px;
+    background: linear-gradient(90deg, var(--sc-bar), var(--sc-brand-strong));
     color: #fff;
+}
+
+#sc-topbar .sc-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff !important;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.01em;
-    z-index: 6;
-    pointer-events: none;
+    text-decoration: none;
+}
+
+#sc-topbar .sc-brand img {
+    border-radius: 6px;
+}
+
+#sc-topbar .sc-account {
+    position: relative;
+    margin-left: auto;
+}
+
+#sc-topbar .sc-account-button {
+    display: flex;
+    padding: 3px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+#sc-topbar .sc-account-button:hover,
+#sc-topbar .sc-account-button[aria-expanded="true"] {
+    background: rgb(255 255 255 / 0.18);
+}
+
+#sc-topbar .sc-account-button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.sc-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: hsl(var(--sc-hue, 140) 55% 42%);
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.sc-avatar.sc-avatar-lg {
+    width: 48px;
+    height: 48px;
+    font-size: 17px;
+    box-shadow: none;
+}
+
+#sc-topbar .sc-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 280px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid var(--sc-line);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px -12px rgb(15 23 42 / 0.3);
+    color: var(--sc-text);
+}
+
+#sc-topbar .sc-menu[hidden] {
+    display: none;
+}
+
+#sc-topbar .sc-menu-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 10px 14px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--sc-line);
+}
+
+#sc-topbar .sc-menu-head strong {
+    display: block;
+    font-size: 15px;
+}
+
+#sc-topbar .sc-menu-head small {
+    display: block;
+    color: var(--sc-muted);
+    font-size: 12.5px;
+    word-break: break-all;
+}
+
+#sc-topbar .sc-menu a {
+    display: block;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--sc-text) !important;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+#sc-topbar .sc-menu a:hover,
+#sc-topbar .sc-menu a:focus-visible {
+    background: var(--sc-brand-tint);
+    outline: none;
+}
+
+#sc-topbar .sc-menu a.sc-signout {
+    margin-top: 6px;
+    border-top: 1px solid var(--sc-line);
+    border-radius: 0 0 8px 8px;
+    color: #b91c1c !important;
+}
+
+html.dark-mode #sc-topbar .sc-menu {
+    background: #111827;
+    border-color: rgb(148 163 184 / 0.2);
+    color: #f8fafc;
+}
+
+html.dark-mode #sc-topbar .sc-menu a {
+    color: #e2e8f0 !important;
+}
+
+html.dark-mode #sc-topbar .sc-menu a:hover {
+    background: rgb(22 163 74 / 0.18);
 }
 
 html:is(.layout-large, .layout-normal) body:not(.task-login):not(.action-print) #layout {
     position: fixed;
     inset: 48px 0 0 0;
     height: auto;
+}
+
+/* The top bar carries the brand and Sign out, so the rail drops its logo, About and Sign out. */
+html:is(.layout-large, .layout-normal) #layout-menu .popover-header,
+html:is(.layout-large, .layout-normal) #layout-menu .special-buttons a.about,
+html:is(.layout-large, .layout-normal) #layout-menu .special-buttons a.logout {
+    display: none !important;
+}
+
+html:not(.dark-mode) #layout-menu .special-buttons {
+    background: transparent !important;
+}
+
+html:not(.dark-mode) #layout-menu .special-buttons a {
+    color: #475569 !important;
 }
 
 /* App rail */

@@ -25,6 +25,13 @@ class FakeMailServer extends MailServer
 
     public array $mailboxList = [];
 
+    public ?string $validPassword = null;
+
+    public function checkMailboxPassword(string $email, string $password): bool
+    {
+        return $password === $this->validPassword;
+    }
+
     protected function run(array $commands, bool $throwError = true): ?string
     {
         $this->commands = [...$this->commands, ...$commands];
@@ -80,7 +87,7 @@ it('adds a domain and starts the hidden mail container', function () {
         ->and($commands)->toContain('dynamic/coolify-mail.yaml')
         ->and($commands)->toContain('docker run -d --name coolify-webmail')
         ->and($commands)->toContain('/var/www/html/plugins/standalonecoders_theme:ro')
-        ->and($commands)->toContain(base64_encode(file_get_contents(resource_path('mail/webmail-theme/theme.css'))))
+        ->and($commands)->toContain(base64_encode(file_get_contents(base_path('templates/webmail-theme/theme.css'))))
         ->and($commands)->toContain(base64_encode($this->mail->proxyRoute('mail.example.com')));
 });
 
@@ -179,4 +186,20 @@ it('attaches the email logo to the email so blocked remote images do not hide it
     expect(email_html_with_inline_logo($html, $email))->toBe('<img src="cid:sc-logo">')
         ->and($email->getAttachments())->toHaveCount(1)
         ->and(email_html_with_inline_logo('<p>No logo</p>', new Email))->toBe('<p>No logo</p>');
+});
+
+it('changes a mailbox password from the webmail only with the secret and the current password', function () {
+    $this->mail->mailboxList = ['info@example.com'];
+    $this->mail->validPassword = 'old-password-123';
+    $url = fn (string $token) => route('webmail.password', $token);
+    $body = ['email' => 'info@example.com', 'current_password' => 'old-password-123', 'password' => 'new-password-456'];
+
+    $this->post($url('wrong-secret'), $body)->assertNotFound();
+    $this->post($url($this->mail->webmailPasswordToken()), [...$body, 'current_password' => 'guess'])->assertStatus(422);
+    $this->post($url($this->mail->webmailPasswordToken()), [...$body, 'email' => 'someone@else.com'])->assertStatus(422);
+    $this->post($url($this->mail->webmailPasswordToken()), [...$body, 'password' => 'short'])->assertStatus(422);
+    expect(implode("\n", $this->mail->commands))->not->toContain('creds password');
+
+    $this->post($url($this->mail->webmailPasswordToken()), $body)->assertOk()->assertSeeText('OK');
+    expect(implode("\n", $this->mail->commands))->toContain("creds password 'info@example.com'");
 });
