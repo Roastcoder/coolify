@@ -93,12 +93,12 @@
                 :title="hasPageSearch
                     ? 'Search this page and everything (Press / or ' + modKeyLabel + 'K, then Tab to switch)'
                     : 'Search (Press / or ' + modKeyLabel + 'K)'"
-                class="menu-item menu-search justify-between !rounded-lg !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint">
+                class="menu-item menu-search justify-between !rounded-xl !bg-neutral-100/80 dark:!bg-white/[0.04] hover:!bg-neutral-200/80 dark:hover:!bg-white/[0.08] !text-fg-faint border border-neutral-200/60 dark:border-white/[0.06] shadow-2xs">
                 <span class="flex items-center gap-2.5 min-w-0">
-                    <x-reicon name="search" class="menu-item-icon" />
-                    <span class="menu-item-label truncate" :class="collapsed && 'lg:hidden'">Search</span>
+                    <x-reicon name="search" class="menu-item-icon text-neutral-400 dark:text-neutral-500" />
+                    <span class="menu-item-label truncate text-[12.5px] font-medium" :class="collapsed && 'lg:hidden'">Search anything...</span>
                 </span>
-                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-lg border border-transparent dark:border-white/5"
+                <kbd class="px-1.5 py-0.5 text-[10px] font-mono font-semibold text-neutral-500 dark:text-neutral-400 bg-white dark:bg-white/[0.08] rounded-md border border-neutral-200/80 dark:border-white/10 shadow-2xs"
                     :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
             </button>
         </div>
@@ -356,11 +356,11 @@
     </ul>
     {{-- Sidebar footer (desktop only; mobile uses a temporary slide-over). It stays visible;
          only the menu above it scrolls on short or zoomed-in screens. --}}
-    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1 bg-neutral-50 px-2 py-2 dark:bg-transparent lg:-mx-3 lg:flex lg:px-3">
+    <div class="sidebar-footer shrink-0 -mx-2 hidden flex-col gap-1.5 bg-neutral-50/80 px-2.5 py-2.5 dark:bg-transparent lg:-mx-3 lg:flex lg:px-3">
         <div class="flex items-center gap-1" :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
             <x-top-user-menu sidebar />
             <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
-                class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0">
+                class="menu-item sidebar-toggle w-8 shrink-0 justify-center px-0 hover:bg-neutral-200/60 dark:hover:bg-white/[0.08] rounded-lg">
                 <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
                     <path :d="collapsed ? 'M16 9v6' : 'M8 9v6'" d="M8 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
@@ -368,12 +368,12 @@
             </button>
         </div>
         {{-- Fork-only: Developer Info badge in sidepanel --}}
-        <div :class="collapsed ? 'hidden' : 'flex'" class="flex items-center justify-between border-t border-neutral-200/60 px-1 pt-1.5 text-[11px] text-neutral-500 dark:border-white/5 dark:text-fg-faint">
+        <div :class="collapsed ? 'hidden' : 'flex'" class="flex items-center justify-between border-t border-neutral-200/70 px-1 pt-2 text-[11px] text-neutral-500 dark:border-white/10 dark:text-fg-faint">
             <span class="flex items-center gap-1.5 font-medium">
                 <span class="inline-block size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Dev: <a href="https://github.com/Roastcoder" target="_blank" rel="noopener" class="font-semibold text-black dark:text-white hover:underline underline-offset-2">@Roastcoder</a></span>
             </span>
-            <span class="font-mono text-[10px] text-neutral-400 dark:text-fg-dim">StandaloneCoders</span>
+            <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">StandaloneCoders</span>
         </div>
     </div>
     <div x-show="collapsed && tooltip.show" x-cloak x-transition.opacity.duration.100ms

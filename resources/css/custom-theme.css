@@ -356,3 +356,145 @@ html {
     scrollbar-width: thin;
     scrollbar-color: rgb(100 116 139 / 0.45) transparent;
 }
+
+/* =========================================================================
+   StandaloneCoders Cloud Modern Dashboard & Layout Overhaul Styles
+   ========================================================================= */
+
+.sc-dashboard-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid var(--color-hairline);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, rgba(15, 23, 42, 0.01) 50%, rgba(56, 189, 248, 0.04) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .sc-dashboard-hero {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(19, 28, 46, 0.7) 40%, rgba(56, 189, 248, 0.04) 100%);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* Executive Metric Stat Cards */
+.sc-stat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 1.125rem 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    transition: all 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dark .sc-stat-card {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(19, 28, 46, 0.65);
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4);
+}
+
+.sc-stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(34, 197, 94, 0.35);
+    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.12);
+}
+
+.dark .sc-stat-card:hover {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(34, 197, 94, 0.12);
+}
+
+/* Pulsing Status Dot */
+.sc-pulse-dot {
+    display: inline-block;
+    position: relative;
+    border-radius: 9999px;
+}
+
+.sc-pulse-dot::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 9999px;
+    background: inherit;
+    opacity: 0.65;
+    animation: sc-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes sc-ping {
+    70%, 100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+/* Modern Section Headers & Card Shells */
+.sc-card-shell {
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.dark .sc-card-shell {
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(19, 28, 46, 0.55);
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.35);
+}
+
+/* Modern Pill Badges */
+.sc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.01em;
+}
+
+/* Polished Sidebar Nav Links */
+html .app-sidebar .menu-item {
+    border-radius: 0.625rem;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html .sidebar-nav .nav-section {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: #94a3b8 !important;
+    padding: 0.625rem 0.625rem 0.25rem !important;
+}
+
+html.dark .sidebar-nav .nav-section {
+    color: #64748b !important;
+}
+
+html .app-sidebar .menu-item-active {
+    background-color: rgba(34, 197, 94, 0.1) !important;
+    color: #15803d !important;
+    font-weight: 600 !important;
+}
+
+html.dark .app-sidebar .menu-item-active {
+    background-color: rgba(34, 197, 94, 0.12) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    box-shadow: 0 0 16px -4px rgba(34, 197, 94, 0.2);
+}
+

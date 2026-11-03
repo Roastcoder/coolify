@@ -43,19 +43,19 @@
                 x-init="new ResizeObserver(([entry]) => $el.style.setProperty('--resource-actions-w', entry.borderBoxSize[0].inlineSize + 'px')).observe($refs.resourceActions)"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
-                class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
+                class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-black/[0.06] dark:border-white/[0.06] shadow-xs">
                 {{-- Brand (width tracks sidebar) --}}
-                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-neutral-50 dark:border-white/[0.04] dark:bg-app transition-[width] duration-200"
+                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-neutral-50/70 dark:border-white/[0.06] dark:bg-[#0b1222]/70 transition-[width] duration-200"
                     :class="collapsed ? 'w-(--sidebar-collapsed-w) justify-center px-0 border-b' : 'w-56 px-4'">
                     <div class="flex items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="StandaloneCoders"
                             class="flex shrink-0 items-center gap-2 hover:opacity-80 transition-opacity">
                             <img src="/standalonecoders-mark.svg" alt="StandaloneCoders" class="size-6 shrink-0" />
                             {{-- Wordmark as text so it follows the light/dark scheme. --}}
-                            <span x-show="!collapsed" class="text-[14px] tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span> <span class="font-normal text-neutral-500 dark:text-fg-dim">Cloud</span></span>
+                            <span x-show="!collapsed" class="text-[14px] tracking-tight text-black dark:text-white"><span class="font-extrabold">Standalone</span><span class="font-normal">Coders</span> <span class="font-normal text-emerald-600 dark:text-emerald-400 font-mono text-xs ml-0.5">Cloud</span></span>
                         </a>
                         <x-version x-show="!collapsed" title="v{{ config('constants.coolify.version') }}"
-                            class="min-w-0 truncate !text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                            class="min-w-0 truncate !text-[10px] font-mono text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
                     </div>
                     @if (isInstanceAdmin() && !isCloud())
                         <div x-show="!collapsed" class="ml-auto shrink-0">
@@ -67,7 +67,7 @@
                 </div>
                 {{-- Collapse toggle + team switcher --}}
                 <div
-                    class="flex h-full items-center gap-0.5 min-w-0 flex-1 border-b border-black/[0.06] pl-3 pr-4 dark:border-white/[0.04]">
+                    class="flex h-full items-center gap-2 min-w-0 flex-1 pl-3 pr-4">
                     <div class="relative flex min-w-0 flex-1 items-center">
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
