@@ -300,6 +300,71 @@
 
         <livewire:profile.passkeys />
 
+        @php
+            $mailServer = app(\App\Services\MailServer::class);
+            $mailHost = $mailServer->hostname();
+        @endphp
+        @if ($mailHost)
+            <section class="application-settings-section">
+                <div class="application-settings-section-header">
+                    <div>
+                        <h2>Mobile & Email App Setup</h2>
+                        <p>Configure your mailbox on iPhone, Android, Outlook, or Apple Mail.</p>
+                    </div>
+                </div>
+                <div class="application-settings-section-body space-y-4">
+                    <div class="rounded-xl border border-neutral-200 bg-neutral-50/50 p-4 dark:border-neutral-800 dark:bg-white/[0.02] space-y-3">
+                        <div class="grid gap-3 sm:grid-cols-2 text-sm">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">Email / Username</span>
+                                <code class="font-mono font-semibold text-neutral-900 dark:text-white">{{ $email }}</code>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">Password</span>
+                                <span class="text-xs italic text-neutral-600 dark:text-fg-dim">Your mailbox password</span>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">Incoming Server (IMAP)</span>
+                                <code class="font-mono font-semibold text-neutral-900 dark:text-white">{{ $mailHost }}:993 (SSL/TLS)</code>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs text-neutral-500 dark:text-fg-dim">Outgoing Server (SMTP)</span>
+                                <code class="font-mono font-semibold text-neutral-900 dark:text-white">{{ $mailHost }}:465 (SSL/TLS)</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2 text-xs">
+                        <div class="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                            <h4 class="font-semibold text-neutral-900 dark:text-white mb-2 flex items-center gap-1.5">
+                                <span>📱 iPhone / iPad (Apple Mail)</span>
+                            </h4>
+                            <ol class="list-decimal list-inside space-y-1.5 text-neutral-600 dark:text-fg-dim">
+                                <li>Open <strong>Settings</strong> &rarr; <strong>Mail</strong> &rarr; <strong>Add Account</strong> &rarr; <strong>Other</strong>.</li>
+                                <li>Tap <strong>Add Mail Account</strong> and enter your email and password.</li>
+                                <li>Select <strong>IMAP</strong> at top.</li>
+                                <li>Incoming Host: <code class="font-mono">{{ $mailHost }}</code>, Username: <code class="font-mono">{{ $email }}</code>.</li>
+                                <li>Outgoing Host: <code class="font-mono">{{ $mailHost }}</code>, Username: <code class="font-mono">{{ $email }}</code>.</li>
+                                <li>Save to finish.</li>
+                            </ol>
+                        </div>
+                        <div class="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                            <h4 class="font-semibold text-neutral-900 dark:text-white mb-2 flex items-center gap-1.5">
+                                <span>🤖 Android (Gmail / Samsung Mail)</span>
+                            </h4>
+                            <ol class="list-decimal list-inside space-y-1.5 text-neutral-600 dark:text-fg-dim">
+                                <li>Open <strong>Gmail app</strong> &rarr; Profile &rarr; <strong>Add account</strong>.</li>
+                                <li>Choose <strong>Other</strong> &rarr; <strong>Personal (IMAP)</strong>.</li>
+                                <li>Incoming: Server <code class="font-mono">{{ $mailHost }}</code>, Port 993, SSL/TLS.</li>
+                                <li>Outgoing: Server <code class="font-mono">{{ $mailHost }}</code>, Port 465, SSL/TLS, Require sign-in.</li>
+                                <li>Tap Next to complete.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        @endif
+
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>

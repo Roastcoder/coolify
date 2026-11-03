@@ -89,8 +89,15 @@ class WebmailController extends Controller
         $uid = (int) $request->query('uid');
         $message = $uid > 0 ? $mailbox->message($folder, $uid) : null;
 
+        try {
+            $mailHostname = app(MailServer::class)->hostname() ?: $request->getHost();
+        } catch (\Throwable) {
+            $mailHostname = $request->getHost();
+        }
+
         return view('webmail.index', [
             'email' => $mailbox->email,
+            'mailHostname' => $mailHostname,
             'folders' => $folders,
             'folder' => $folder,
             'role' => collect($folders)->firstWhere('path', $folder)['role'] ?? null,

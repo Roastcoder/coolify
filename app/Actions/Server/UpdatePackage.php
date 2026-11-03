@@ -87,6 +87,7 @@ class UpdatePackage
 
         return match ($packageManager) {
             'apt' => [
+                'env DEBIAN_FRONTEND=noninteractive dpkg --configure -a --force-confdef --force-confold 2>/dev/null || true',
                 'env DEBIAN_FRONTEND=noninteractive apt-get update -qq',
                 $escapedPackage === null
                     ? "env DEBIAN_FRONTEND=noninteractive apt-get {$aptOptions} upgrade"

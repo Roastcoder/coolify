@@ -36,7 +36,11 @@ class MailServer
 
     public function primaryDomain(): ?string
     {
-        return MailDomain::query()->orderBy('id')->value('name');
+        try {
+            return MailDomain::query()->orderBy('id')->value('name');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function hostname(): ?string

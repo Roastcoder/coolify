@@ -519,6 +519,76 @@
                 </div>
             </div>
 
+            {{-- Mobile & Email Apps Connection Details --}}
+            <div class="border-t border-slate-200 pt-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Mobile & Email Apps Setup</h4>
+                    <span class="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">iOS & Android Ready</span>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Connect this mailbox to Apple Mail, Gmail, Outlook, or Thunderbird using these server credentials:
+                </p>
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 font-medium">Email / Username:</span>
+                        <code class="rounded bg-white px-2 py-0.5 font-mono font-semibold text-slate-800 border border-slate-200">{{ $email }}</code>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 font-medium">Incoming (IMAP):</span>
+                        <code class="rounded bg-white px-2 py-0.5 font-mono font-semibold text-slate-800 border border-slate-200">{{ $mailHostname }}:993 (SSL)</code>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 font-medium">Outgoing (SMTP):</span>
+                        <code class="rounded bg-white px-2 py-0.5 font-mono font-semibold text-slate-800 border border-slate-200">{{ $mailHostname }}:465 (SSL)</code>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500 font-medium">Password:</span>
+                        <span class="text-slate-600 font-medium italic">Your mailbox password</span>
+                    </div>
+                </div>
+
+                {{-- Expandable Step-by-step guides --}}
+                <div class="space-y-2 pt-1 text-xs">
+                    <details class="group rounded-lg border border-slate-200 bg-white p-3">
+                        <summary class="cursor-pointer list-none font-semibold text-slate-800 flex items-center justify-between [&::-webkit-details-marker]:hidden">
+                            <span class="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" class="size-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="3" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>
+                                <span>Setup on iPhone / iPad (Apple Mail)</span>
+                            </span>
+                            <span class="text-slate-400 group-open:rotate-180 transition-transform">&darr;</span>
+                        </summary>
+                        <ol class="mt-2.5 list-decimal list-inside space-y-1.5 text-slate-600 pl-1 leading-relaxed">
+                            <li>Open <strong>Settings</strong> &rarr; <strong>Mail</strong> &rarr; <strong>Accounts</strong> &rarr; <strong>Add Account</strong>.</li>
+                            <li>Choose <strong>Other</strong> &rarr; <strong>Add Mail Account</strong>.</li>
+                            <li>Enter your Name, Email (<code class="text-slate-800">{{ $email }}</code>), and Password.</li>
+                            <li>Select <strong>IMAP</strong> at the top.</li>
+                            <li>Under <em>Incoming Mail Server</em>: Host Name = <code class="text-slate-800">{{ $mailHostname }}</code>, Username = <code class="text-slate-800">{{ $email }}</code>, Password = your password.</li>
+                            <li>Under <em>Outgoing Mail Server</em>: Host Name = <code class="text-slate-800">{{ $mailHostname }}</code>, Username = <code class="text-slate-800">{{ $email }}</code>, Password = your password.</li>
+                            <li>Tap <strong>Save</strong> to finish.</li>
+                        </ol>
+                    </details>
+
+                    <details class="group rounded-lg border border-slate-200 bg-white p-3">
+                        <summary class="cursor-pointer list-none font-semibold text-slate-800 flex items-center justify-between [&::-webkit-details-marker]:hidden">
+                            <span class="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" class="size-4 text-green-600" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></svg>
+                                <span>Setup on Android (Gmail / Samsung Mail)</span>
+                            </span>
+                            <span class="text-slate-400 group-open:rotate-180 transition-transform">&darr;</span>
+                        </summary>
+                        <ol class="mt-2.5 list-decimal list-inside space-y-1.5 text-slate-600 pl-1 leading-relaxed">
+                            <li>Open <strong>Gmail app</strong> &rarr; Tap profile icon &rarr; <strong>Add another account</strong>.</li>
+                            <li>Select <strong>Other</strong> &rarr; enter your email address &rarr; choose <strong>Personal (IMAP)</strong>.</li>
+                            <li>Enter your mailbox password.</li>
+                            <li>Incoming Server: <code class="text-slate-800">{{ $mailHostname }}</code>, Port: <strong>993</strong>, Security: <strong>SSL/TLS</strong>.</li>
+                            <li>Outgoing Server: <code class="text-slate-800">{{ $mailHostname }}</code>, Port: <strong>465</strong> (or <strong>587</strong>), Security: <strong>SSL/TLS</strong>, Require sign-in: <strong>Yes</strong>.</li>
+                            <li>Tap <strong>Next</strong> to finish.</li>
+                        </ol>
+                    </details>
+                </div>
+            </div>
+
             {{-- Change Password Section --}}
             <div class="border-t border-slate-200 pt-5 space-y-3">
                 <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Change Mailbox Password</h4>
