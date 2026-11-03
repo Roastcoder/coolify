@@ -47,12 +47,14 @@ class Updates extends Component
         }
 
         $this->settings = instanceSettings();
-        $this->auto_update_frequency = $this->settings->auto_update_frequency;
-        $this->update_check_frequency = $this->settings->update_check_frequency;
-        $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
+        $this->auto_update_frequency = $this->settings->auto_update_frequency ?? '0 0 * * *';
+        $this->update_check_frequency = $this->settings->update_check_frequency ?? '0 * * * *';
+        $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled ?? false;
         $this->docker_registry_url = $this->settings->docker_registry_url ?: 'docker.io';
-        $this->update_channel = $this->settings->update_channel;
-        $this->update_custom_tag = $this->settings->update_custom_tag;
+        // Fork columns — added in the 2026-11 migration. Guard against older DB schemas
+        // where the migration has not yet run (e.g. the container restarted mid-upgrade).
+        $this->update_channel = $this->settings->update_channel ?? 'stable';
+        $this->update_custom_tag = $this->settings->update_custom_tag ?? null;
     }
 
     public function instantSave()

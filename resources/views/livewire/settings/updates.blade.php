@@ -1,9 +1,23 @@
 <div>
     <x-slot:title>
-        Update Settings | Coolify
+        Update Settings | StandaloneCoders Cloud
     </x-slot>
 
     <x-settings.layout>
+        {{-- Fork-only: StandaloneCoders Cloud feature highlights shown on the Updates page. --}}
+        <div class="rounded-lg border border-coollabs/30 bg-coollabs/5 p-4 text-sm dark:border-brand/25 dark:bg-brand/5">
+            <p class="mb-2 font-semibold text-coollabs dark:text-brand-light">✨ What's new in StandaloneCoders Cloud</p>
+            <ul class="space-y-1 text-neutral-700 dark:text-fg-faint">
+                <li>📬 <strong>StandaloneCoders Mail</strong> — compose, reply, and forward emails right in the dashboard</li>
+                <li>📥 <strong>Built-in mail server (Maddy)</strong> — manage mailboxes without a third-party email host</li>
+                <li>🌐 <strong>Custom mail domain</strong> — set your own domain under
+                    <a href="{{ route('settings.mail-server') }}" class="underline underline-offset-2">Settings › Mail server</a>
+                    to access webmail at <code>mail.yourdomain.com</code>
+                </li>
+                <li>⬆️ <strong>One-click update</strong> — pull the latest build of this fork with the button below</li>
+            </ul>
+        </div>
+
         <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
             {{-- Exclude is_auto_update_enabled (instantSave) so the bar does not flash. --}}
             <x-unsaved-bar action="submit" targets="update_check_frequency,auto_update_frequency,update_channel,update_custom_tag" />
