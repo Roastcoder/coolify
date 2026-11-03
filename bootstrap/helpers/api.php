@@ -10,6 +10,7 @@ use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\ServerSetting;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
@@ -179,6 +180,41 @@ function exposeSensitiveFields(Model $model): Model
 }
 
 /**
+ * Hide the locked (shown once) values that a serialized resource still contains, also for tokens
+ * that can read sensitive data: the generated compose of an application or service, and the
+ * connection URLs of a database with a locked password.
+ *
+ * @template T of array|SupportCollection
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function redactLockedApiResourceValues(Model $resource, array|SupportCollection $payload): array|SupportCollection
+{
+    if (($resource instanceof Application || $resource instanceof Service) && filled($payload['docker_compose'] ?? null)) {
+        $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $resource);
+    }
+
+    $urlKeys = array_filter(['internal_db_url', 'external_db_url'], fn (string $key): bool => filled($payload[$key] ?? null));
+    if ($urlKeys !== [] && method_exists($resource, 'isCredentialLocked') && $resource->isCredentialLocked()) {
+        foreach ($urlKeys as $key) {
+            $payload[$key] = null;
+        }
+    }
+
+    return $payload;
+}
+
+/**
+ * Serialize a resource for a list API response: sensitive fields when the token can read them,
+ * without locked values.
+ */
+function serializeApiResource(Model $resource): array
+{
+    return redactLockedApiResourceValues($resource, exposeSensitiveFields($resource)->toArray());
+}
+
+/**
  * Shared validation rules for application create and update API endpoints.
  *
  * Pass the existing application on update so unchanged manual webhook secrets
@@ -189,6 +225,8 @@ function sharedDataApplications(?Application $application = null): array
     return [
         'git_repository' => 'string',
         'git_branch' => ['string', new ValidGitBranch],
+        'git_https_username' => ['string', 'nullable', 'max:255', 'regex:/^[^:\r\n]*$/'],
+        'git_https_password' => ['string', 'nullable', 'max:2048', 'regex:/^[^\r\n]*$/'],
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
@@ -228,6 +266,7 @@ function sharedDataApplications(?Application $application = null): array
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
+        'rolling_update_drain_seconds' => 'integer|min:0|max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
         'domains' => ValidationPatterns::applicationDomainRules(),
@@ -241,7 +280,7 @@ function sharedDataApplications(?Application $application = null): array
         'build_command' => ValidationPatterns::shellSafeCommandRules(),
         'start_command' => ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
-        'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+        'ports_mappings' => ValidationPatterns::portMappingRules(),
         'custom_network_aliases' => 'string|nullable',
         'base_directory' => ValidationPatterns::directoryPathRules(),
         'publish_directory' => ValidationPatterns::directoryPathRules(),
@@ -490,6 +529,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
     $request->offsetUnset('stop_grace_period');
+    $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');

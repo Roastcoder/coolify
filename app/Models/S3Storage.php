@@ -23,6 +23,32 @@ class S3Storage extends BaseModel
 
     private const REQUEST_TIMEOUT_SECONDS = 15;
 
+    /**
+     * Endpoint host suffixes of providers that reject path-style URLs: Alibaba Cloud OSS, Tencent Cloud COS
+     * (buckets created after 2024-01-01), and Volcengine / BytePlus TOS.
+     */
+    private const VIRTUAL_HOSTED_STYLE_HOST_SUFFIXES = ['aliyuncs.com', 'myqcloud.com', 'volces.com', 'bytepluses.com'];
+
+    /**
+     * Parts of the errors that these providers return for a path-style request.
+     */
+    private const PATH_STYLE_REJECTION_ERRORS = ['secondleveldomainforbidden', 'pathstyledomainforbidden', 'virtual hosted style', 'virtual-hosted style', 'virtual-styled'];
+
+    /**
+     * Waits before the second and the third attempt of an upload with the MinIO client.
+     */
+    private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
+
+    /**
+     * The exception code of runSshProcess() when a remote command times out.
+     */
+    private const REMOTE_COMMAND_TIMEOUT_EXIT_CODE = 124;
+
+    /**
+     * How long the helper container waits for a TCP connection to one IP of the endpoint.
+     */
+    private const RESOLVE_PROBE_TIMEOUT_SECONDS = 5;
+
     protected $fillable = [
         'team_id',
         'name',
@@ -32,6 +58,7 @@ class S3Storage extends BaseModel
         'secret',
         'bucket',
         'endpoint',
+        'use_path_style_endpoint',
         'is_usable',
         'unusable_email_sent',
     ];
@@ -43,6 +70,7 @@ class S3Storage extends BaseModel
 
     protected $casts = [
         'is_usable' => 'boolean',
+        'use_path_style_endpoint' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
@@ -217,9 +245,7 @@ class S3Storage extends BaseModel
                 throw new \RuntimeException('S3 bucket name is not allowed: '.$validator->errors()->first('bucket'));
             }
 
-            $disk = $this->filesystem();
-            // Test the connection by listing files with ListObjectsV2 (S3)
-            $disk->files();
+            $this->listFilesWithAddressingStyleFallback();
 
             $this->unusable_email_sent = false;
             $this->is_usable = true;
@@ -265,7 +291,7 @@ class S3Storage extends BaseModel
             'secret' => $this['secret'],
             'bucket' => $this['bucket'],
             'endpoint' => $this['endpoint'],
-            'use_path_style_endpoint' => true,
+            'use_path_style_endpoint' => $this->usesPathStyleEndpoint(),
             'http' => array_merge(SafeWebhookUrl::httpClientOptions($this['endpoint'], $this->trustedInternalHosts()), [
                 'connect_timeout' => self::CONNECTION_TIMEOUT_SECONDS,
                 'timeout' => self::REQUEST_TIMEOUT_SECONDS,
@@ -280,6 +306,122 @@ class S3Storage extends BaseModel
     public function minioClientRegionOption(): string
     {
         return '-e '.escapeshellarg('MC_REGION='.$this->region);
+    }
+
+    /**
+     * Path-style URLs (`endpoint/bucket`) are the default. Providers like Alibaba Cloud OSS only accept
+     * virtual-hosted-style URLs (`bucket.endpoint`). A storage that is not saved yet has no value, so it uses the default.
+     */
+    public function usesPathStyleEndpoint(): bool
+    {
+        return $this->use_path_style_endpoint ?? true;
+    }
+
+    /**
+     * The URL style for a new storage: virtual-hosted style for providers that reject path-style URLs, else path-style.
+     */
+    public static function detectPathStyleEndpoint(?string $endpoint): bool
+    {
+        $host = strtolower((string) parse_url((string) $endpoint, PHP_URL_HOST));
+
+        return ! collect(self::VIRTUAL_HOSTED_STYLE_HOST_SUFFIXES)
+            ->contains(fn (string $suffix): bool => $host === $suffix || str_ends_with($host, '.'.$suffix));
+    }
+
+    /**
+     * Tests the connection with ListObjectsV2. When the provider rejects path-style URLs, it tests again with
+     * virtual-hosted-style URLs and keeps that style when it works.
+     */
+    private function listFilesWithAddressingStyleFallback(): void
+    {
+        try {
+            $this->filesystem()->files();
+        } catch (\Throwable $exception) {
+            if (! $this->usesPathStyleEndpoint() || ! self::isPathStyleRejection($exception)) {
+                throw $exception;
+            }
+
+            $this->use_path_style_endpoint = false;
+            try {
+                $this->filesystem()->files();
+            } catch (\Throwable) {
+                $this->use_path_style_endpoint = true;
+
+                throw $exception;
+            }
+        }
+    }
+
+    private static function isPathStyleRejection(\Throwable $exception): bool
+    {
+        for ($current = $exception; $current !== null; $current = $current->getPrevious()) {
+            if (str($current->getMessage())->lower()->contains(self::PATH_STYLE_REJECTION_ERRORS)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The `mc alias set` options. `--api S3v4` signs as filesystem() does. Without it, mc probes the signature
+     * version on every run, and a network error during the probe makes it try S3v2, which most providers reject.
+     * `--path off` uses virtual-hosted-style URLs, as filesystem() does. With path-style URLs, mc keeps its own
+     * `auto` lookup, as before.
+     */
+    public function minioClientAliasOptions(): string
+    {
+        return ' --api S3v4'.($this->usesPathStyleEndpoint() ? '' : ' --path off');
+    }
+
+    /**
+     * The mc `--resolve` option that pins the endpoint host to one of its validated IPs. mc keeps one IP per host,
+     * so when the host has more than one IP, a helper container on the upload network connects to each IP, IPv4
+     * first, and the first IP that connects is used. A server without IPv4 then uses an IPv6 address of a
+     * dual-stack endpoint. When no IP connects, the first IP is used, so mc reports the real connection error.
+     */
+    public function minioClientResolveOptions(Server $server, string $image, ?string $network = null): string
+    {
+        $entries = SafeWebhookUrl::minioClientResolveOptions($this->endpoint, $this->trustedInternalHosts());
+        if ($entries === []) {
+            return '';
+        }
+
+        $entry = $entries[0];
+        if (count($entries) > 1) {
+            $ips = array_map(fn (string $entry): string => str($entry)->afterLast('=')->toString(), $entries);
+            $port = (int) str($entries[0])->beforeLast('=')->afterLast(':')->toString();
+            $probe = 'for ip in '.implode(' ', array_map('escapeshellarg', $ips)).'; do'
+                .' if timeout '.self::RESOLVE_PROBE_TIMEOUT_SECONDS.' bash -c "exec 3<>/dev/tcp/$ip/'.$port.'" 2>/dev/null; then echo "$ip"; exit 0; fi;'
+                .' done';
+            $reachableIp = trim((string) instant_remote_process(
+                ['docker run --rm'.($network === null ? '' : ' --network '.escapeshellarg($network))
+                    .' '.escapeshellarg($image).' bash -c '.escapeshellarg($probe)],
+                $server,
+                throwError: false,
+                timeout: count($ips) * self::RESOLVE_PROBE_TIMEOUT_SECONDS + 60,
+                disableMultiplexing: true,
+            ));
+            $reachableIndex = array_search($reachableIp, $ips, true);
+            if ($reachableIndex !== false) {
+                $entry = $entries[$reachableIndex];
+            }
+        }
+
+        return ' --resolve '.escapeshellarg($entry);
+    }
+
+    /**
+     * Runs an upload of a local file with the MinIO client again when it fails, for example after a short network
+     * outage. A timeout is not retried, because another full attempt can pass the timeout of the backup job.
+     */
+    public static function retryMinioClientUpload(callable $upload): mixed
+    {
+        return retry(
+            self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS,
+            $upload,
+            when: fn (\Throwable $exception): bool => $exception->getCode() !== self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE,
+        );
     }
 
     /**

@@ -60,17 +60,20 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'custom_server_limit',
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
+        'is_two_factor_required',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
+        'is_two_factor_required' => false,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
+        'is_two_factor_required' => 'boolean',
     ];
 
     protected static function booted()
@@ -80,7 +83,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::updating(function ($team) {
-            if (auth()->user()?->isMember()) {
+            if (auth()->user()?->roleInTeam($team->id) === 'member') {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
@@ -337,7 +340,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
     public function members()
     {
-        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
+        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role', 'access');
     }
 
     public function subscription()

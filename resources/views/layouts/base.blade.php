@@ -137,6 +137,72 @@
             root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0f172a' : '#f5f7fa');
         };
+        // Time lines for chart tooltips. By default only the browser time zone is shown;
+        // the "Chart times" option on the Appearance page adds the UTC time.
+        window.chartTooltipTime = (timestamp, { seconds = true } = {}) => {
+            const format = (timeZone) => new Date(timestamp).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                ...(seconds ? { second: '2-digit' } : {}),
+                hourCycle: 'h23',
+                ...(timeZone ? { timeZone, timeZoneName: 'short' } : {}),
+            });
+            if (localStorage.getItem('chartTimes') !== 'utc') {
+                return `<div class="apexcharts-tooltip-custom-title">${format()}</div>`;
+            }
+            const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            return `<div class="apexcharts-tooltip-custom-title">Your time: ${format(localTimeZone)}</div>
+                <div class="apexcharts-tooltip-custom-title">UTC: ${format('UTC')}</div>`;
+        };
+        // Shows the tooltip at the same time on every chart of a group while one of them is hovered.
+        // ApexCharts' own chart.group needs equal widths and equal x ranges, so it does not
+        // fit side-by-side cards. Instead, replay the hover as a mouse event at the matching x.
+        // Charts can join a group from separate scripts; charts removed from the page drop out.
+        window.chartSyncGroups ??= {};
+        window.syncChartTooltips = (group, charts) => {
+            const grid = chart => chart.el.querySelector('.apexcharts-grid')?.getBoundingClientRect();
+            const hoverArea = chart => chart.el.querySelector('.apexcharts-svg');
+            const hide = chart => hoverArea(chart)?.dispatchEvent(new MouseEvent('mouseout', { clientX: 0, clientY: -1 }));
+            const peers = source => window.chartSyncGroups[group].filter(chart => chart !== source && chart.el.isConnected);
+
+            window.chartSyncGroups[group] = [
+                ...(window.chartSyncGroups[group] ?? []).filter(chart => chart.el.isConnected),
+                ...charts,
+            ];
+
+            charts.forEach(source => {
+                source.el.addEventListener('mousemove', event => {
+                    // Replayed events are untrusted; skip them so charts do not echo each other.
+                    const rect = grid(source);
+                    const { minX, maxX } = source.w.globals;
+                    if (!event.isTrusted || !rect?.width || !(maxX > minX)) {
+                        return;
+                    }
+                    // ApexCharts hides the source tooltip outside the plot grid; hide the peers too.
+                    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+                        peers(source).forEach(hide);
+                        return;
+                    }
+                    const timestamp = minX + (event.clientX - rect.left) / rect.width * (maxX - minX);
+
+                    peers(source).forEach(chart => {
+                        const target = grid(chart);
+                        const { minX: min, maxX: max } = chart.w.globals;
+                        if (!target?.width || !(max > min) || timestamp < min || timestamp > max) {
+                            hide(chart);
+                            return;
+                        }
+                        hoverArea(chart)?.dispatchEvent(new MouseEvent('mousemove', {
+                            clientX: target.left + (timestamp - min) / (max - min) * target.width,
+                            clientY: target.top + target.height / 2,
+                        }));
+                    });
+                });
+                source.el.addEventListener('mouseleave', () => peers(source).forEach(hide));
+            });
+        };
         // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
         window.themeControls = () => ({
             theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
@@ -144,6 +210,7 @@
             pageWidth: localStorage.getItem('pageWidth') || 'centered',
             navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
             navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
+            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
             presets: window.customThemePresets,
             // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
@@ -228,6 +295,10 @@
                 this.navItems = style;
                 localStorage.setItem('navItems', style);
                 document.documentElement.dataset.navItems = style;
+            },
+            setChartTimes(value) {
+                this.chartTimes = value;
+                localStorage.setItem('chartTimes', value);
             },
         });
 
@@ -378,7 +449,9 @@
         let theme = localStorage.theme
         let cpuColor = '#1e90ff'
         let ramColor = '#00ced1'
-        let textColor = '#ffffff'
+        // Chart text follows the CSS text color, so it stays readable after a theme change without a re-render
+        // (for example a page that Livewire restores from its cache on Back).
+        const textColor = 'currentColor'
         let editorBackground = '#181818'
         let editorTheme = 'blackboard'
 
@@ -390,16 +463,38 @@
             if (theme == 'dark' || (theme == 'custom' && document.documentElement.classList.contains('dark'))) {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#ffffff'
                 editorBackground = '#181818'
                 editorTheme = 'blackboard'
             } else {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
-                textColor = '#000000'
                 editorBackground = '#ffffff'
                 editorTheme = null
             }
+        }
+        // Chart legend in a card header: one entry per series with its last known value.
+        // items: [{ name, color, data: [[timestamp, value], ...], formatter }]
+        function renderChartLegend(element, items) {
+            if (!element) return;
+            element.replaceChildren(...items.map(({ name, color, data, formatter }) => {
+                const last = (data || []).findLast(point => point?.[1] !== null && point?.[1] !== undefined);
+                const item = document.createElement('span');
+                item.className = 'inline-flex items-center gap-1.5';
+                const dot = document.createElement('span');
+                dot.className = 'size-2 shrink-0 rounded-full';
+                dot.style.backgroundColor = color;
+                const label = document.createElement('span');
+                label.className = 'text-neutral-500 dark:text-fg-dim';
+                label.textContent = name;
+                item.append(dot, label);
+                if (last) {
+                    const value = document.createElement('span');
+                    value.className = 'font-medium tabular-nums text-black dark:text-fg';
+                    value.textContent = formatter(last[1]);
+                    item.append(value);
+                }
+                return item;
+            }));
         }
         @auth
             window.Pusher = Pusher;

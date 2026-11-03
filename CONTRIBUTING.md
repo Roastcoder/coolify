@@ -230,6 +230,8 @@ To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
 
 ### Testing the Coolify Helper Locally
 
+The helper image lives in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). The development setup builds its `main` branch as `coollabsio/coolify-helper:dev`, set the helper version override to `dev` to use it. `scripts/dev-helper` builds it from there too, or from a local checkout with `HELPER_CONTEXT=../coolify-helper/src`.
+
 Use `scripts/dev-helper` to build a local helper image and test it with the running development instance. The script requires the standard local Coolify container and the seeded Dockerfile, Docker Compose, and Nixpacks applications.
 
 Run the complete workflow:

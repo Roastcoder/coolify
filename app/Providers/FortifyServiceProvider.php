@@ -9,6 +9,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Models\OauthSetting;
 use App\Models\User;
 use App\Support\PasskeyRelyingParty;
+use App\Support\RootSetupWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ServiceProvider;
@@ -56,6 +57,7 @@ class FortifyServiceProvider extends ServiceProvider
 
             return view('auth.register', [
                 'isFirstUser' => $isFirstUser,
+                'isRootSetupWindowClosed' => $isFirstUser && ! RootSetupWindow::isOpen(),
             ]);
         });
 

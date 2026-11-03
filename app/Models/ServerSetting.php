@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -29,7 +31,6 @@ use OpenApi\Attributes as OA;
         'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
         'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean'],
         'is_logdrain_custom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_traffic_analytics_enabled' => ['type' => 'boolean'],
@@ -49,12 +50,12 @@ use OpenApi\Attributes as OA;
         'is_usable' => ['type' => 'boolean'],
         'logdrain_axiom_api_key' => ['type' => 'string'],
         'logdrain_axiom_dataset_name' => ['type' => 'string'],
+        'logdrain_axiom_domain' => ['type' => 'string', 'description' => 'Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co.'],
         'logdrain_cloudwatch_region' => ['type' => 'string'],
         'logdrain_cloudwatch_group' => ['type' => 'string'],
         'logdrain_cloudwatch_stream_prefix' => ['type' => 'string'],
         'logdrain_custom_config' => ['type' => 'string'],
         'logdrain_custom_config_parser' => ['type' => 'string'],
-        'logdrain_highlight_project_id' => ['type' => 'string'],
         'logdrain_newrelic_base_uri' => ['type' => 'string'],
         'logdrain_newrelic_license_key' => ['type' => 'string'],
         'sentinel_metrics_history_days' => ['type' => 'integer'],
@@ -93,6 +94,11 @@ class ServerSetting extends Model
 
     public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
 
+    /**
+     * Axiom edge deployment for US East 1. See https://axiom.co/docs/reference/edge-deployments.
+     */
+    public const string DEFAULT_AXIOM_DOMAIN = 'us-east-1.aws.edge.axiom.co';
+
     protected $fillable = [
         'server_id',
         'is_swarm_manager',
@@ -109,11 +115,10 @@ class ServerSetting extends Model
         'is_logdrain_newrelic_enabled',
         'logdrain_newrelic_license_key',
         'logdrain_newrelic_base_uri',
-        'is_logdrain_highlight_enabled',
-        'logdrain_highlight_project_id',
         'is_logdrain_axiom_enabled',
         'logdrain_axiom_dataset_name',
         'logdrain_axiom_api_key',
+        'logdrain_axiom_domain',
         'is_swarm_worker',
         'is_logdrain_custom_enabled',
         'logdrain_custom_config',
@@ -227,6 +232,9 @@ class ServerSetting extends Model
         'logdrain_custom_config_parser',
         'geoip_maxmind_license_key',
     ];
+
+    /** @var list<string>|null */
+    private static ?array $columnsWithoutPatchCheckResult = null;
 
     protected static function booted()
     {
@@ -460,6 +468,17 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Selects every column except patch_check_result, which holds the full update list of the last patch
+     * check (often tens of kilobytes). Use it for instance-wide server loops that do not read the result.
+     */
+    public function scopeWithoutPatchCheckResult(Builder $query): Builder
+    {
+        self::$columnsWithoutPatchCheckResult ??= array_values(array_diff(Schema::getColumnListing($this->getTable()), ['patch_check_result']));
+
+        return $query->select(self::$columnsWithoutPatchCheckResult);
     }
 
     /**

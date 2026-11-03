@@ -45,12 +45,16 @@ class Show extends Component
     #[Validate(['integer', 'required', 'min:60', 'max:36000'])]
     public $timeout = 300;
 
+    #[Locked]
+    public string $serverTimezone = 'UTC';
+
     public function mount(Application|Service $resource, ScheduledTask $task): void
     {
         $this->resource = $resource;
         $this->type = $resource->type();
         $this->parameters = get_route_parameters();
         $this->task = $resource->scheduled_tasks()->whereKey($task->id)->firstOrFail();
+        $this->serverTimezone = getServerTimezone($this->task->server());
         $this->syncData();
     }
 
@@ -141,7 +145,7 @@ class Show extends Component
     public function delete()
     {
         try {
-            $this->authorize('update', $this->resource);
+            $this->authorize('delete', $this->resource);
             $this->authorize('delete', $this->task);
             $this->task->delete();
             auditLog('ui.scheduled_task.deleted', $this->taskAuditContext());

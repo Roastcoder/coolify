@@ -26,9 +26,16 @@
 
         @if ($customHealthcheckFound)
             <div class="mb-4">
-                <x-callout type="warning" title="Custom healthcheck detected">
-                    Enabling this configuration replaces the custom healthcheck currently defined by the application.
-                </x-callout>
+                @if ($healthCheckEnabled)
+                    <x-callout type="warning" title="Dockerfile HEALTHCHECK replaced">
+                        This healthcheck replaces the HEALTHCHECK from the Dockerfile. Disable it to use the
+                        Dockerfile HEALTHCHECK again.
+                    </x-callout>
+                @else
+                    <x-callout type="info" title="Dockerfile HEALTHCHECK in use">
+                        The application uses the HEALTHCHECK from its Dockerfile. Enabling this healthcheck replaces it.
+                    </x-callout>
+                @endif
             </div>
         @endif
 
@@ -85,19 +92,19 @@
                 </div>
             </x-application.settings-subsection>
         @endif
-    </x-application.settings-section>
 
-    <x-application.settings-section id="healthcheck-timing-section" title="Timing and retries"
-        helper="Control how quickly healthchecks start, repeat, and fail.">
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckRetries" placeholder="3" label="Retries" required />
-            <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
-                id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
-        </div>
+        <x-application.settings-subsection id="healthcheck-timing-section" title="Timing and retries"
+            helper="Control how quickly healthchecks start, repeat, and fail.">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckInterval" placeholder="30" label="Interval (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckTimeout" placeholder="30" label="Timeout (seconds)" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckRetries" placeholder="3" label="Retries" required />
+                <x-forms.input canGate="update" :canResource="$resource" min="1" type="number"
+                    id="healthCheckStartPeriod" placeholder="30" label="Start period (seconds)" required />
+            </div>
+        </x-application.settings-subsection>
     </x-application.settings-section>
 </form>

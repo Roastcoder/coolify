@@ -8,7 +8,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -66,7 +65,6 @@ class DenseTestableMetrics extends Metrics
 beforeEach(function () {
     // The settings hook starts Sentinel when metrics turn on. A sync queue would run it and make a real SSH call.
     Queue::fake();
-    Concurrency::setDefaultInstance('sync');
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $user = User::factory()->create();
     $team = Team::factory()->create();
@@ -79,7 +77,7 @@ beforeEach(function () {
 
 it('dispatches a chart payload with every trend series', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(ChartTestableMetrics::class)
         ->call('loadData')
@@ -96,7 +94,7 @@ it('dispatches a chart payload with every trend series', function () {
 
 it('includes KPI-tile spark series aligned to one shared time axis', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(ChartTestableMetrics::class)
         ->call('loadData')
@@ -115,7 +113,7 @@ it('includes KPI-tile spark series aligned to one shared time axis', function ()
 
 it('caps KPI-tile sparks to a readable point count on a shared axis', function () {
     $s = Server::factory()->create(['team_id' => $this->team->id, 'private_key_id' => $this->privateKey->id]);
-    $s->settings->update(['is_metrics_enabled' => true]);
+    $s->settings->forceFill(['is_metrics_enabled' => true, 'is_reachable' => true, 'is_usable' => true])->saveQuietly();
 
     Livewire::test(DenseTestableMetrics::class)
         ->call('loadData')

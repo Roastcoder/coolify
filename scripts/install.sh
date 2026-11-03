@@ -11,11 +11,22 @@
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
 
+## Arguments that can be passed:
+## --preview or --nightly - Install the newest version of the preview or nightly channel and switch the instance to that update channel
+
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 CDN="https://cdn.coollabs.io/coolify"
+CHANNEL="stable"
+case "$1" in
+--preview | --nightly)
+    CHANNEL="${1#--}"
+    CDN="https://cdn.coollabs.io/coolify/$CHANNEL"
+    shift
+    ;;
+esac
 DATE=$(date +"%Y%m%d-%H%M%S")
 
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
@@ -518,9 +529,10 @@ if [ "$OS_TYPE" = 'amzn' ]; then
 fi
 
 # Fetch versions.json once and parse all values from it
-VERSIONS_JSON=$(curl -L --silent $CDN/versions.json)
-LATEST_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-LATEST_HELPER_VERSION=$(echo "$VERSIONS_JSON" | grep -i version | xargs | awk '{print $6}' | tr -d ',')
+VERSIONS_JSON=$(curl -L --silent https://cdn.coollabs.io/coolify/versions.json)
+CHANNEL_VERSIONS=$(echo "$VERSIONS_JSON" | sed -n "/^    \"$CHANNEL\": {/,/^    }/p")
+LATEST_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"coolify"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+LATEST_HELPER_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
 
 if [ -z "$LATEST_HELPER_VERSION" ]; then
     LATEST_HELPER_VERSION=latest
@@ -966,12 +978,16 @@ update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_BACKEND_PORT" "6001"
 
-# Add default root user credentials from environment variables
-if [ -n "$ROOT_USERNAME" ] && [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+# Add default root user credentials from environment variables (ROOT_USERNAME is optional)
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
     echo " - Setting predefined root user credentials from environment"
-    update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    if [ -n "$ROOT_USERNAME" ]; then
+        update_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    fi
     update_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
     update_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
+elif [ -n "$ROOT_USERNAME" ] || [ -n "$ROOT_USER_EMAIL" ] || [ -n "$ROOT_USER_PASSWORD" ]; then
+    warn "Predefined root user skipped: set both ROOT_USER_EMAIL and ROOT_USER_PASSWORD."
 fi
 
 if [ -n "${REGISTRY_URL+x}" ]; then
@@ -1024,8 +1040,8 @@ if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
     test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
     chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
-    # Remove only the key from a previous install (generated with the comment "coolify"), not other keys that contain "coolify"
-    sed -i -E "/[[:space:]]coolify[[:space:]]*$/d" ~/.ssh/authorized_keys
+    # Remove only the key from a previous install (comment "coolify", or "root@coolify" before September 2024), not other keys that contain "coolify"
+    sed -i -E "/[[:space:]](root@)?coolify[[:space:]]*$/d" ~/.ssh/authorized_keys
     cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
     rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
@@ -1125,6 +1141,11 @@ if [ "$HEALTH" != "healthy" ]; then
 fi
 step_done
 
+if [ "$CHANNEL" != "stable" ]; then
+    docker exec coolify php artisan app:update-channel "$CHANNEL" || warn "Could not switch the instance to the $CHANNEL update channel, switch it on the update page"
+    ui_flush_warnings
+fi
+
 if [ "$UI_TTY" = true ]; then
     printf '%s\n' "$(ui_bar 100 "done")" >&3
 fi
@@ -1163,6 +1184,9 @@ for IP in $PRIVATE_IPS; do
     fi
 done
 
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
+    printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+fi
 printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
 printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
 

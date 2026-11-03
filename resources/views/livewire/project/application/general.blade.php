@@ -11,11 +11,11 @@
             targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
-            @if ($buildPack === 'dockercompose')
+            @if ($buildPack === 'dockercompose' && filled($dockerComposeRaw))
                 <x-slot:actions>
                     <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
                         x-on:click="$wire.dispatch('loadCompose', false)">
-                        {{ $application->docker_compose_raw ? 'Reload compose' : 'Load compose' }}
+                        Reload compose
                     </x-forms.button>
                 </x-slot:actions>
             @endif
@@ -249,7 +249,7 @@
                                             </div>
                                         @endif
                                 </div>
-                                @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                @if ($this->application->supportsWatchPaths())
                                     <div class="pt-4">
                                         <x-forms.textarea
                                             helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
@@ -272,7 +272,7 @@
                                     @endif
                                 @endif
                             </x-forms.repository-paths>
-                            @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                            @if ($this->application->supportsWatchPaths())
                                 <div class="pb-4">
                                     <x-forms.textarea
                                         helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."

@@ -23,7 +23,8 @@
                  delay skips the overlay for fast requests. --}}
             run(label, action) {
                 const timer = setTimeout(() => this.busy = label, 150);
-                return Promise.resolve().then(action).catch(() => {}).finally(() => {
+                {{-- Start the action now: callers clear their inputs right after run(). --}}
+                return new Promise((resolve) => resolve(action())).catch(() => {}).finally(() => {
                     clearTimeout(timer);
                     this.busy = null;
                 });
@@ -52,10 +53,19 @@
 
         <x-slot:badges>
             <x-beta-badge />
+            @if ($containerRunning && $filesLoaded && count($availableContainers) > 1)
+                <div class="-my-0.5 w-full sm:w-72" wire:key="file-browser-container-{{ $container }}"
+                    x-data="{ selected: @js($container) }"
+                    x-init="$watch('selected', (name) => run('Loading files...', () => $wire.selectContainer(name)))">
+                    <x-forms.listbox id="file-browser-container" :wire="false" x-model="selected" searchable portal
+                        searchPlaceholder="Search containers"
+                        :options="collect($availableContainers)->map(fn ($name) => ['value' => $name, 'label' => $name])->all()" />
+                </div>
+            @endif
         </x-slot:badges>
 
         <x-slot:actions>
-            @if ($containerRunning && $filesLoaded)
+            @if ($containerRunning && $filesLoaded && ! $shellUnavailable)
                 <input type="file" class="hidden" x-ref="uploadInput"
                     @change="if ($event.target.files.length) { uploadFile($event.target.files[0]); $event.target.value = '' }" />
                 <x-forms.button type="button" title="Upload a file to this folder" canGate="canAccessTerminal" :canResource="$resource"
@@ -117,6 +127,14 @@
                 <x-forms.button type="button" @click="run('Loading files...', () => $wire.refresh())" title="Refresh this folder">
                     Refresh
                 </x-forms.button>
+            @elseif (! $filesLoaded && ! $loadFailed)
+                {{-- Disabled placeholders keep the header at its loaded height. --}}
+                <x-forms.button type="button" disabled>Upload</x-forms.button>
+                <x-forms.button type="button" disabled>
+                    New
+                    <x-reicon name="chevron-down" class="size-3.5" />
+                </x-forms.button>
+                <x-forms.button type="button" disabled>Refresh</x-forms.button>
             @endif
         </x-slot:actions>
 
@@ -136,6 +154,13 @@
                     <x-reicon name="folder" class="size-8" />
                 </x-slot:icon>
             </x-empty>
+        @elseif ($shellUnavailable)
+            <x-empty title="File browser is not available"
+                description="Coolify cannot open the files of this container. {{ $helperError }}">
+                <x-slot:icon>
+                    <x-reicon name="folder" class="size-8" />
+                </x-slot:icon>
+            </x-empty>
         @else
             {{-- Keep the current listing visible while an action runs: blur it
                  and show the action label (from run()) on top of it. --}}
@@ -150,33 +175,18 @@
             </div>
             <div x-bind:class="busy && 'pointer-events-none select-none blur-[2px] opacity-60'"
                 class="transition-[filter,opacity] duration-150 motion-reduce:transition-none">
-            {{-- Container picker (services / multi-container) --}}
-            @if (count($availableContainers) > 1)
-                <div class="flex flex-wrap items-center gap-2 border-b border-coollabs-hairline px-4 py-2">
-                    <span class="text-xs text-coollabs-subtle">Container</span>
-                    @foreach ($availableContainers as $name)
-                        <button type="button" x-on:click="run('Loading files...', () => $wire.selectContainer(@js($name)))"
-                            @class([
-                                'button',
-                                'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-white/[0.08] dark:text-white dark:ring-white/15' => $name === $container,
-                            ])>{{ $name }}</button>
-                    @endforeach
-                </div>
-            @endif
-
             {{-- Breadcrumb. The root crumb renders as "/" and doubles as the
                  first separator, so we only draw a slash between named segments
                  (index >= 2) - avoids the "/ /" duplicate. --}}
-            <div class="flex flex-wrap items-center gap-1 px-4 py-2 text-sm">
+            <div class="flex flex-wrap items-center px-4 py-2.5 text-sm">
                 @foreach ($this->breadcrumbs() as $crumb)
                     @if ($loop->index > 1)
                         <span class="text-coollabs-subtle">/</span>
                     @endif
                     <button type="button" x-on:click="run('Loading files...', () => $wire.goTo(@js($crumb['path'])))"
                         @class([
-                            'rounded-md px-1.5 py-0.5 hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]',
-                            'text-current font-medium' => $loop->last,
-                            'text-coollabs-subtle' => ! $loop->last,
+                            'text-current font-medium cursor-default' => $loop->last,
+                            'cursor-pointer text-coollabs-subtle underline-offset-4 hover:text-current hover:underline' => ! $loop->last,
                         ])>
                         {{ $crumb['label'] }}
                     </button>
@@ -259,81 +269,56 @@
                                 <div class="text-coollabs-subtle tabular-nums">
                                     {{ $entry['mtime'] ? \Illuminate\Support\Carbon::createFromTimestamp($entry['mtime'])->toDateTimeString() : '-' }}
                                 </div>
-                                {{-- Actions kebab. The entry name lives in this
-                                     row's x-data as a JS string so the menu can
-                                     call $wire.* with it directly - passing @js()
-                                     through a component attribute double-encodes
-                                     the quotes and breaks the handler. --}}
+                                {{-- The entry name lives in this row's x-data as a JS
+                                     string so the menu can call $wire.* with it directly -
+                                     passing @js() through a component attribute
+                                     double-encodes the quotes and breaks the handler. --}}
                                 <div class="flex items-center justify-end"
-                                    x-data="{ open: false, name: @js($entry['name']), isDir: @js($entry['type'] === 'dir') }"
-                                    @keydown.escape.window="open = false">
-                                    <div class="relative">
-                                        <button type="button" title="Actions" aria-label="Actions" x-ref="trigger"
-                                            x-on:click="open = !open" x-bind:aria-expanded="open"
-                                            x-bind:class="open && 'bg-black/5 text-current dark:bg-white/[0.08]'"
-                                            class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-coollabs-subtle hover:bg-black/5 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs/40 dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/30">
-                                            <x-reicon name="dots-horizontal" class="size-4" />
-                                        </button>
-                                        <template x-teleport="body">
-                                            <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-                                                x-anchor.bottom-end.fixed.offset.4="$refs.trigger"
-                                                @click.outside="open = false"
-                                                class="listbox-panel min-w-52! w-52! z-50!">
-                                                @if ($entry['type'] !== 'dir')
-                                                    <button type="button" class="listbox-option"
-                                                        x-on:click="open = false; run('Opening file...', () => $wire.openEditor(name))">
-                                                        <x-reicon name="file-content" class="size-3.5 shrink-0" />
-                                                        <span class="min-w-0 flex-1 text-left">Edit</span>
-                                                    </button>
-                                                @endif
-                                                <button type="button" class="listbox-option"
-                                                    x-on:click="open = false; run(isDir ? 'Preparing folder download...' : 'Preparing file download...', () => $wire.download(name))">
-                                                    <x-reicon name="download" class="size-3.5 shrink-0" />
-                                                    <span class="min-w-0 flex-1 text-left">Download</span>
-                                                </button>
-
-                                                {{-- Rename --}}
-                                                <x-modal-input title="Rename">
-                                                    <x-slot:content>
-                                                        <button type="button" class="listbox-option" x-on:click="open = false">
-                                                            <x-reicon name="edit" class="size-3.5 shrink-0" />
-                                                            <span class="min-w-0 flex-1 text-left">Rename</span>
-                                                        </button>
-                                                    </x-slot:content>
-                                                    <form x-data="{ newName: @js($entry['name']) }"
-                                                        @submit.prevent="run('Renaming...', () => $wire.renameEntry(name, newName)); $dispatch('close-modal')"
-                                                        class="flex flex-col gap-4">
-                                                        <x-forms.input id="renameName-{{ $loop->index }}"
-                                                            label="New name" x-model="newName" required />
-                                                        <div class="flex justify-end">
-                                                            <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Rename</x-forms.button>
-                                                        </div>
-                                                    </form>
-                                                </x-modal-input>
-
-                                                {{-- Delete --}}
-                                                <x-modal-input title="Delete this item?">
-                                                    <x-slot:content>
-                                                        <button type="button" class="listbox-option" x-on:click="open = false">
-                                                            <x-reicon name="trash" class="size-3.5 shrink-0 text-red-600 dark:text-red-500" />
-                                                            <span class="min-w-0 flex-1 text-left text-red-600 dark:text-red-500">Delete</span>
-                                                        </button>
-                                                    </x-slot:content>
-                                                    <div class="flex flex-col gap-4">
-                                                        <p class="text-sm text-coollabs-subtle">
-                                                            This permanently deletes
-                                                            <span class="font-medium">{{ $entry['name'] }}</span>
-                                                            inside the container. This cannot be undone.
-                                                        </p>
-                                                        <div class="flex justify-end">
-                                                            <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
-                                                                x-on:click="run(isDir ? 'Deleting folder...' : 'Deleting file...', () => $wire.deleteEntry(name)); $dispatch('close-modal')">Delete</x-forms.button>
-                                                        </div>
+                                    x-data="{ name: @js($entry['name']), isDir: @js($entry['type'] === 'dir') }">
+                                    <x-table.row-actions label="File actions">
+                                        @if ($entry['type'] !== 'dir')
+                                            <x-table.row-action
+                                                x-on:click="run('Opening file...', () => $wire.openEditor(name))">
+                                                Edit
+                                            </x-table.row-action>
+                                        @endif
+                                        <x-table.row-action
+                                            x-on:click="run(isDir ? 'Preparing folder download...' : 'Preparing file download...', () => $wire.download(name))">
+                                            Download
+                                        </x-table.row-action>
+                                        <x-modal-input title="Rename">
+                                            <x-slot:content>
+                                                <x-table.row-action>Rename</x-table.row-action>
+                                            </x-slot:content>
+                                            <form x-data="{ newName: @js($entry['name']) }"
+                                                @submit.prevent="run('Renaming...', () => $wire.renameEntry(name, newName)); $dispatch('close-modal')"
+                                                class="flex flex-col gap-4">
+                                                <x-forms.input id="renameName-{{ $loop->index }}"
+                                                    label="New name" x-model="newName" required />
+                                                <div class="flex justify-end">
+                                                    <x-forms.button type="submit" isHighlighted canGate="canAccessTerminal" :canResource="$resource">Rename</x-forms.button>
+                                                </div>
+                                            </form>
+                                        </x-modal-input>
+                                        <x-slot:danger>
+                                            <x-modal-input title="Delete this item?">
+                                                <x-slot:content>
+                                                    <x-table.row-action>Delete</x-table.row-action>
+                                                </x-slot:content>
+                                                <div class="flex flex-col gap-4">
+                                                    <p class="text-sm text-coollabs-subtle">
+                                                        This permanently deletes
+                                                        <span class="font-medium">{{ $entry['name'] }}</span>
+                                                        inside the container. This cannot be undone.
+                                                    </p>
+                                                    <div class="flex justify-end">
+                                                        <x-forms.button isError type="button" canGate="canAccessTerminal" :canResource="$resource"
+                                                            x-on:click="run(isDir ? 'Deleting folder...' : 'Deleting file...', () => $wire.deleteEntry(name)); $dispatch('close-modal')">Delete</x-forms.button>
                                                     </div>
-                                                </x-modal-input>
-                                            </div>
-                                        </template>
-                                    </div>
+                                                </div>
+                                            </x-modal-input>
+                                        </x-slot:danger>
+                                    </x-table.row-actions>
                                 </div>
                             </div>
                         @endforeach

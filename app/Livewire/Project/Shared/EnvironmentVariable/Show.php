@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
@@ -36,6 +37,7 @@ class Show extends Component
         return $this->isSharedVariable ? null : $this->env->resourceable;
     }
 
+    #[Locked]
     public $parameters;
 
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
@@ -129,6 +131,9 @@ class Show extends Component
 
     public function mount()
     {
+        if ($this->composeInfo !== null && ! (auth()->user()?->can('update', $this->resource) ?? false)) {
+            $this->composeInfo['default'] = null;
+        }
         $this->syncData();
         if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
@@ -161,9 +166,10 @@ class Show extends Component
      */
     public function loadValues(): void
     {
-        $this->authorize('update', $this->env);
+        $this->authorize('view', $this->env);
 
-        if ($this->valuesLoaded) {
+        // Users without viewSensitive open the editor with the value hidden; nothing to decrypt.
+        if ($this->valuesLoaded || $this->valuesHiddenForUser()) {
             return;
         }
 
@@ -198,6 +204,7 @@ class Show extends Component
             $this->env->resolveReferencedValue(),
             $this->env->resourceable,
             revealLockedSharedVariables: false,
+            canReveal: ModelsEnvironmentVariable::sharedVariablesReadableBy(auth()->user()),
         );
     }
 
@@ -224,11 +231,14 @@ class Show extends Component
                 $this->env->is_shared = $this->is_shared;
             }
             $this->env->key = $this->key;
-            $this->env->value = $this->value;
+            // The form never holds a locked value, so keep the stored one and keep the lock.
+            if (! $this->env->is_shown_once) {
+                $this->env->value = $this->value;
+                $this->env->is_shown_once = $this->is_shown_once;
+            }
             $this->env->comment = $this->comment;
             $this->env->is_multiline = $this->is_multiline;
             $this->env->is_literal = $this->is_literal;
-            $this->env->is_shown_once = $this->is_shown_once;
             $this->env->save();
             $this->valuesLoaded = true;
         } else {
@@ -283,7 +293,7 @@ class Show extends Component
 
     private function valuesHiddenForUser(): bool
     {
-        return auth()->user()?->cannot('update', $this->env) ?? true;
+        return auth()->user()?->cannot('viewSensitive', $this->env) ?? true;
     }
 
     public function checkEnvs()
@@ -356,9 +366,11 @@ class Show extends Component
                 }
             }
 
-            if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
-                $oldValue = $this->env->getOriginal('value');
-                $this->value = $oldValue;
+            $submittedValue = $this->env->is_shown_once ? $this->env->value : $this->value;
+            if (! $this->isSharedVariable && $this->is_required && str($submittedValue)->isEmpty()) {
+                if (! $this->env->is_shown_once) {
+                    $this->value = $this->env->getOriginal('value');
+                }
                 $this->dispatch('error', 'Required environment variables cannot be empty.');
 
                 return;
@@ -448,7 +460,7 @@ class Show extends Component
 
         // Check if user can view team variables
         try {
-            $this->authorize('view', $team);
+            $this->authorize('viewSharedVariables', $team);
             $result['team'] = $team->environment_variables()
                 ->pluck('key')
                 ->toArray();
@@ -465,31 +477,31 @@ class Show extends Component
 
             if ($project) {
                 try {
-                    $this->authorize('view', $project);
+                    $this->authorize('viewSharedVariables', $project);
                     $result['project'] = $project->environment_variables()
                         ->pluck('key')
                         ->toArray();
-
-                    // Get environment variables if we have an environment_uuid in route
-                    $environmentUuid = data_get($this->parameters, 'environment_uuid');
-                    if ($environmentUuid) {
-                        $environment = $project->environments()
-                            ->where('uuid', $environmentUuid)
-                            ->first();
-
-                        if ($environment) {
-                            try {
-                                $this->authorize('view', $environment);
-                                $result['environment'] = $environment->environment_variables()
-                                    ->pluck('key')
-                                    ->toArray();
-                            } catch (AuthorizationException $e) {
-                                // User not authorized to view environment variables
-                            }
-                        }
-                    }
                 } catch (AuthorizationException $e) {
                     // User not authorized to view project variables
+                }
+
+                // Get environment variables if we have an environment_uuid in route
+                $environmentUuid = data_get($this->parameters, 'environment_uuid');
+                if ($environmentUuid) {
+                    $environment = $project->environments()
+                        ->where('uuid', $environmentUuid)
+                        ->first();
+
+                    if ($environment) {
+                        try {
+                            $this->authorize('viewSharedVariables', $environment);
+                            $result['environment'] = $environment->environment_variables()
+                                ->pluck('key')
+                                ->toArray();
+                        } catch (AuthorizationException $e) {
+                            // User not authorized to view environment variables
+                        }
+                    }
                 }
             }
         }
@@ -504,7 +516,7 @@ class Show extends Component
 
             if ($server) {
                 try {
-                    $this->authorize('view', $server);
+                    $this->authorize('viewSharedVariables', $server);
                     $result['server'] = $server->environment_variables()
                         ->pluck('key')
                         ->toArray();
@@ -523,7 +535,7 @@ class Show extends Component
 
                 if ($application && $application->destination && $application->destination->server) {
                     try {
-                        $this->authorize('view', $application->destination->server);
+                        $this->authorize('viewSharedVariables', $application->destination->server);
                         $result['server'] = $application->destination->server->environment_variables()
                             ->pluck('key')
                             ->toArray();
@@ -542,7 +554,7 @@ class Show extends Component
 
                     if ($service && $service->server) {
                         try {
-                            $this->authorize('view', $service->server);
+                            $this->authorize('viewSharedVariables', $service->server);
                             $result['server'] = $service->server->environment_variables()
                                 ->pluck('key')
                                 ->toArray();

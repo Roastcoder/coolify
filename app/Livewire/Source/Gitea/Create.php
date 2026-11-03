@@ -50,7 +50,7 @@ class Create extends Component
     public function createGiteaApp()
     {
         try {
-            $this->authorize('createAnyResource');
+            $this->authorize('create', GiteaApp::class);
 
             $this->html_url = rtrim($this->html_url, '/');
             $this->api_url = filled($this->api_url)
@@ -66,6 +66,10 @@ class Create extends Component
                 'is_system_wide' => 'required|bool',
                 'organization' => 'nullable|string',
             ]);
+
+            if ($this->is_system_wide) {
+                $this->authorize('makeSystemWide', GiteaApp::class);
+            }
 
             $gitea_app = GiteaApp::create([
                 'name' => $this->name,

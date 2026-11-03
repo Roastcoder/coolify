@@ -258,6 +258,38 @@ describe('POST /api/v1/servers/import', function () {
         Queue::assertNotPushed(ValidateAndInstallServerJob::class);
     });
 
+    test('rejects a database entry that names a model outside the database types', function () {
+        $otherTeam = Team::factory()->create();
+        $otherKey = PrivateKey::factory()->create(['team_id' => $otherTeam->id]);
+
+        $export = $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->getJson("/api/v1/servers/{$this->server->uuid}/export")
+            ->json();
+
+        $this->application->forceDelete();
+        $this->server->forceDelete();
+        $this->privateKey->delete();
+
+        data_set($export, 'projects.0.environments.0.databases', [[
+            'type' => 'NotADatabase',
+            'model' => Application::class,
+            'attributes' => [
+                'name' => 'injected-app',
+                'git_repository' => 'git@github.com:victim/private.git',
+                'git_branch' => 'main',
+                'build_pack' => 'nixpacks',
+                'ports_exposes' => '80',
+                'private_key_id' => $otherKey->id,
+            ],
+        ]]);
+
+        $this->withHeaders(transferHeaders($this->sensitiveToken))
+            ->postJson('/api/v1/servers/import', ['bundle' => $export, 'dry_run' => false])
+            ->assertStatus(422);
+
+        expect(Application::where('name', 'injected-app')->exists())->toBeFalse();
+    });
+
     test('rejects import when the destination team is at its cloud server limit', function () {
         config()->set('constants.coolify.self_hosted', false);
         $this->team->update(['custom_server_limit' => 1]);
@@ -504,6 +536,24 @@ describe('POST /api/v1/servers/{uuid}/migrate', function () {
             ->assertOk()
             ->assertJsonPath('migration.status', 'running')
             ->assertJsonPath('migration.target_url', 'https://8.8.8.8');
+    });
+
+    test('rejects a team admin, because a transfer sends every secret to the target', function () {
+        Queue::fake();
+        Http::fake(['*/api/v1/servers/import/check*' => Http::response(['message' => 'ok', 'checks' => []])]);
+        $admin = User::factory()->create();
+        $this->team->members()->attach($admin->id, ['role' => 'admin']);
+        $adminToken = $admin->createToken('admin-sensitive', ['*', 'read:sensitive'], teamId: $this->team->id)->plainTextToken;
+
+        $this->withHeaders(transferHeaders($adminToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/migrate", [
+                'target_url' => 'https://8.8.8.8',
+                'target_token' => 'target-token',
+            ])
+            ->assertForbidden();
+
+        Queue::assertNothingPushed();
+        expect(data_get($this->server->fresh()->server_metadata, 'migration'))->toBeNull();
     });
 
     test('rejects a target without https', function () {

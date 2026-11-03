@@ -3,7 +3,8 @@
 //
 // DOM-free: `node --test` imports this file.
 
-import { apart, BOX_GAP, freeSpot, MAX_ZOOM, MIN_ZOOM } from './canvas-core.js';
+import { BOX_GAP, freeSpot, MAX_ZOOM, MIN_ZOOM } from './canvas-core.js';
+import { compareEnvironmentNames } from './environment-order.js';
 
 export const CARD_WIDTH = 260;
 export const COLUMN_GAP = 48;
@@ -130,7 +131,12 @@ const contextGroups = nodes => {
   }
   // Server view: the unmanaged containers group comes first, so it is not lost below many projects.
   const unmanaged = ([, members]) => (members[0]?.type === 'container' ? 0 : 1);
-  return [...groups.entries()].sort((a, b) => unmanaged(a) - unmanaged(b) || a[0].localeCompare(b[0]));
+  // Then by project, then production, staging, and development before the other environments.
+  const project = ([name, members]) => members[0]?.project?.name ?? name;
+  const environment = ([name, members]) => members[0]?.environment?.name ?? name;
+  return [...groups.entries()].sort(
+    (a, b) => unmanaged(a) - unmanaged(b) || project(a).localeCompare(project(b)) || compareEnvironmentNames(environment(a), environment(b)),
+  );
 };
 const byTypeAndName = (a, b) => columnOf(a) - columnOf(b) || String(a.name).localeCompare(String(b.name));
 
@@ -464,12 +470,18 @@ const frameAround = (boxes, side, top) => {
   return grow({ x, y, w: Math.max(...boxes.map(b => b.x + b.w)) - x, h: Math.max(...boxes.map(b => b.y + b.h)) - y }, side, top);
 };
 
+// Area of `b` within `gap` of `a`: 0 when they are apart().
+const crowding = (a, b, gap) => Math.max(0, Math.min(a.x + a.w + gap, b.x + b.w) - Math.max(a.x - gap, b.x))
+  * Math.max(0, Math.min(a.y + a.h + gap, b.y + b.h) - Math.max(a.y - gap, b.y));
+
 /**
  * What a dragged card must keep clear of, for freeSpot(): `others` are the
  * other cards and the other zone frames (and, server view, the other project /
  * environment frames in its zone), grown by the room the card's own frames
  * take around it. `fits` checks the card's own frames, which also span its
- * other cards, against those frames.
+ * other cards, against those frames: they must not come closer to them than
+ * at the start of the drag. Frames that are already too close (the layout
+ * uses estimated card heights) do not lock the cards in place.
  */
 export function dragRules(graph, positions, sizes, id) {
   const node = graph.nodes.find(n => n.id === id);
@@ -487,11 +499,20 @@ export function dragRules(graph, positions, sizes, id) {
   const groupMates = grouped ? rects(own.nodes.filter(n => context(n) === context(node))) : [];
   // The other box must keep the frame's room on the side that faces the card.
   const room = (b, s, t) => ({ x: b.x - s, y: b.y - s, w: b.w + s * 2, h: b.h + s + t });
+  const at = node && cardRect(node, positions, sizes);
+  const notCloser = (frame, boxes, gap) => {
+    const start = at ? frame(toBox(at)) : null;
+    return box => {
+      const moved = frame(box);
+      return boxes.every(b => crowding(moved, b, gap) <= (start ? crowding(start, b, gap) : 0));
+    };
+  };
+  const zoneFits = notCloser(box => frameAround([...zoneMates, box], side, top), zones, BOX_GAP);
+  // Same gap between groups as layoutServerView, so a reload does not move the group.
+  const groupFits = grouped ? notCloser(box => frameAround([...groupMates, box], groupSide, groupTop), groups, GROUP_GAP) : () => true;
   return {
     others: [...rects(graph.nodes), ...zones.map(z => room(z, side, top)), ...groups.map(g => room(g, groupSide, groupTop))],
-    fits: box => zones.every(z => apart(frameAround([...zoneMates, box], side, top), z, BOX_GAP))
-      // Same gap between groups as layoutServerView, so a reload does not move the group.
-      && (!grouped || groups.every(g => apart(frameAround([...groupMates, box], groupSide, groupTop), g, GROUP_GAP))),
+    fits: box => zoneFits(box) && groupFits(box),
   };
 }
 
@@ -622,7 +643,7 @@ export function statusLabel(status) {
 }
 
 /**
- * Connect and server views: projects of the resources, each with its environments, sorted by name.
+ * Connect and server views: projects of the resources sorted by name, each with its environments in environment order.
  * @returns {{uuid: string, name: string, environments: {uuid: string, name: string}[]}[]}
  */
 export function filterOptions(graph) {
@@ -634,7 +655,7 @@ export function filterOptions(graph) {
   }
   const byName = (a, b) => String(a.name).localeCompare(String(b.name));
   return [...projects.values()]
-    .map(p => ({ uuid: p.uuid, name: p.name, environments: [...p.environments.values()].sort(byName) }))
+    .map(p => ({ uuid: p.uuid, name: p.name, environments: [...p.environments.values()].sort((a, b) => compareEnvironmentNames(a.name, b.name)) }))
     .sort(byName);
 }
 

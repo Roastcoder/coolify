@@ -13,7 +13,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -35,6 +34,10 @@ class StubMetricsClient extends SentinelMetricsClient
 
     public function summary(): ?array
     {
+        if (in_array('summary', self::$failingMetrics, true)) {
+            throw new RuntimeException('summary unavailable');
+        }
+
         return self::$summaries[$this->server->uuid] ?? null;
     }
 
@@ -77,7 +80,6 @@ class ProcessTestableMetrics extends Metrics
 beforeEach(function () {
     // The settings hook starts Sentinel when metrics turn on. A sync queue would run it and make a real SSH call.
     Queue::fake();
-    Concurrency::setDefaultInstance('sync');
     StubMetricsClient::$summaries = [];
     StubMetricsClient::$containers = [];
     StubMetricsClient::$histories = [];
@@ -93,10 +95,11 @@ beforeEach(function () {
     $this->team = $team;
 });
 
-function metricsServer($team, $privateKey): Server
+function metricsServer($team, $privateKey, bool $reachable = true): Server
 {
     $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => $privateKey->id]);
     $server->settings->update(['is_metrics_enabled' => true]);
+    $server->settings->forceFill(['is_reachable' => $reachable, 'is_usable' => $reachable])->saveQuietly();
 
     return $server;
 }
@@ -112,7 +115,7 @@ function onlineSummary(array $overrides = []): array
 
 it('keeps an unreachable server in the table but excludes it from KPIs', function () {
     $ok = metricsServer($this->team, $this->privateKey);
-    $dead = metricsServer($this->team, $this->privateKey);
+    $dead = metricsServer($this->team, $this->privateKey, reachable: false);
 
     StubMetricsClient::$summaries = [
         $ok->uuid => onlineSummary(['cpu' => 30.0]),
@@ -134,7 +137,6 @@ it('keeps an unreachable server in the table but excludes it from KPIs', functio
 it('counts a reachable server as online when Sentinel returns no summary', function () {
     $server = metricsServer($this->team, $this->privateKey);
     $server->update(['name' => 'web-1']);
-    $server->settings->forceFill(['is_reachable' => true, 'is_usable' => true])->saveQuietly();
     StubMetricsClient::$summaries = [$server->uuid => null];
 
     $component = Livewire::test(TestableMetrics::class)
@@ -165,7 +167,7 @@ it('ranks containers across servers by the selected metric', function () {
 it('shows the KPI tiles, a stale badge for offline servers, and the container toggle', function () {
     $ok = metricsServer($this->team, $this->privateKey);
     $ok->update(['name' => 'web-1']);
-    $dead = metricsServer($this->team, $this->privateKey);
+    $dead = metricsServer($this->team, $this->privateKey, reachable: false);
     $dead->update(['name' => 'web-2']);
 
     StubMetricsClient::$summaries = [
@@ -299,6 +301,30 @@ it('permits team members to read metrics', function () {
     expect(Livewire::test(TestableMetrics::class)->get('kpis')['serversOnline'])->toBe(1);
 });
 
+it('does not query Sentinel on a server that Coolify cannot reach', function () {
+    $server = metricsServer($this->team, $this->privateKey, reachable: false);
+    StubMetricsClient::$summaries = [$server->uuid => onlineSummary()];
+    StubMetricsClient::$histories = [$server->uuid => ['cpu' => [[1000, 25.0]]]];
+
+    $component = Livewire::test(TestableMetrics::class);
+
+    $row = collect($component->get('serverRows'))->firstWhere('uuid', $server->uuid);
+    expect($row['online'])->toBeFalse();
+    expect($row['reporting'])->toBeFalse();
+    expect($component->get('chartData')['cpu'])->toBe([]);
+});
+
+it('shows the page when every Sentinel read fails', function () {
+    $server = metricsServer($this->team, $this->privateKey);
+    StubMetricsClient::$failingMetrics = ['summary', 'cpu', 'memory', 'disk', 'load'];
+
+    $component = Livewire::test(TestableMetrics::class)->assertOk();
+
+    $row = collect($component->get('serverRows'))->firstWhere('uuid', $server->uuid);
+    expect($row['reporting'])->toBeFalse();
+    expect($component->get('kpis')['serversReporting'])->toBe(0);
+});
+
 it('keeps host trends when an older Sentinel has no summary endpoint', function () {
     $server = metricsServer($this->team, $this->privateKey);
     StubMetricsClient::$histories = [$server->uuid => ['cpu' => [[1000, 25.0]], 'memory' => [[1000, 100.0]]]];
@@ -363,8 +389,7 @@ it('clears stale container rankings after a server transfer', function () {
     expect($component->get('serverRows'))->toBe([]);
 });
 
-it('merges metrics from real concurrent workers and isolates endpoint failures', function () {
-    Concurrency::setDefaultInstance('process');
+it('merges metrics of several servers and isolates endpoint failures', function () {
     metricsServer($this->team, $this->privateKey);
     metricsServer($this->team, $this->privateKey);
 
@@ -376,6 +401,32 @@ it('merges metrics from real concurrent workers and isolates endpoint failures',
     expect($component->get('chartData')['memory'])->toBe([[1000, 200.0]]);
     expect($component->get('chartData')['disk'])->toBe([]);
     expect($component->get('chartData')['networkRx'])->toBe([[1000, 10.0]]);
+});
+
+it('resolves container names with a fixed number of queries', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $apps = Application::factory()->count(3)->create(['environment_id' => $environment->id]);
+    $component = Livewire::test(TestableMetrics::class)->instance();
+    $component->containersRaw = $apps->map(fn ($app) => ['id' => $app->uuid])->push(['id' => 'coolify-proxy'])->all();
+
+    DB::enableQueryLog();
+    $names = $apps->map(fn ($app) => $component->containerMeta($app->uuid)['name']);
+    $proxy = $component->containerMeta('coolify-proxy');
+
+    expect($names->all())->toBe($apps->pluck('name')->all())
+        ->and($proxy)->toBe(['name' => 'coolify-proxy', 'image' => null, 'link' => null])
+        ->and(count(DB::getQueryLog()))->toBeLessThan(20);
+});
+
+it('does not show the name of another team’s resource for a container', function () {
+    $project = Project::factory()->create(['team_id' => Team::factory()->create()->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $foreign = Application::factory()->create(['environment_id' => $environment->id]);
+
+    $meta = Livewire::test(TestableMetrics::class)->instance()->containerMeta($foreign->uuid);
+
+    expect($meta)->toBe(['name' => $foreign->uuid, 'image' => null, 'link' => null]);
 });
 
 it('clears stale metrics after the last server is deleted', function () {

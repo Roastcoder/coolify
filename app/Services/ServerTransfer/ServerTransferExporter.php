@@ -899,6 +899,7 @@ class ServerTransferExporter
         // Ensure hidden encrypted fields are included as plaintext.
         foreach ([
             'http_basic_auth_password',
+            'git_https_password',
             'manual_webhook_secret_github',
             'manual_webhook_secret_gitlab',
             'manual_webhook_secret_bitbucket',
@@ -1488,6 +1489,7 @@ class ServerTransferExporter
             'secret' => $storage->secret,
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
+            'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
             'is_usable' => (bool) $storage->is_usable,
         ];
     }
@@ -1643,6 +1645,7 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'keeps_production_values' => $preview->keeps_production_values,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

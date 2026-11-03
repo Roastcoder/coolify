@@ -430,6 +430,12 @@ class ImportForm extends Component
                 return;
             }
 
+            if (! StartDatabaseImport::allowsSourcePath($this->resource, $this->customLocation)) {
+                $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
+
+                return;
+            }
+
             if (! $this->server) {
                 $this->dispatch('error', 'Server not found. Please refresh the page.');
 
@@ -627,6 +633,12 @@ class ImportForm extends Component
             return;
         }
 
+        if (! StartDatabaseImport::allowsSourcePath($this->resource, $cleanPath)) {
+            $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
+
+            return;
+        }
+
         try {
             $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
 
@@ -648,7 +660,7 @@ class ImportForm extends Component
                 'secret' => $s3Storage->secret,
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
-                'use_path_style_endpoint' => true,
+                'use_path_style_endpoint' => $s3Storage->usesPathStyleEndpoint(),
                 'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
             ]);
 
