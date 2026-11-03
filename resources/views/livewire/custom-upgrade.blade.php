@@ -39,7 +39,7 @@
                 @else
                     <x-forms.button type="button" wire:click="update" isHighlighted>
                         <span wire:loading.remove wire:target="update">
-                            Update now ({{ substr($latestSha ?? '', 0, 7) }})
+                            New version available! Update now
                         </span>
                         <span wire:loading wire:target="update" class="inline-flex items-center gap-1.5">
                             <svg class="size-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
@@ -67,13 +67,20 @@
                 </span>
             @else
                 <button type="button" wire:click="update"
-                    aria-label="Update available"
+                    aria-label="New version available"
                     title="Click to install update ({{ substr($latestSha ?? '', 0, 7) }})"
                     class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand/25 dark:hover:bg-brand/20">
-                    <span wire:loading.remove wire:target="update">Update available</span>
+                    <span wire:loading.remove wire:target="update">New version available</span>
                     <span wire:loading wire:target="update">Starting…</span>
                 </button>
             @endif
+        @endif
+    @else
+        @if ($fullButton)
+            <x-forms.button type="button" disabled class="opacity-60 cursor-default">
+                <x-reicon name="check" class="size-3.5 text-success" />
+                <span>Latest version ({{ substr($currentSha ?? 'latest', 0, 7) }})</span>
+            </x-forms.button>
         @endif
     @endif
 </div>
