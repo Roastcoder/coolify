@@ -602,6 +602,8 @@ body.task-login #logo {
 }
 
 body.task-login #login-form {
+    /* Elastic pushes the form down with top: 20%; the flex column centers it instead. */
+    top: 0 !important;
     width: 100%;
     max-width: 380px;
     padding: 0;
