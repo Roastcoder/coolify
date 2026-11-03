@@ -66,7 +66,7 @@
                 <a href="{{ $github }}" class="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300 hover:border-green-400/60">
                     <span class="size-1.5 rounded-full bg-green-400"></span> Open source, Apache-2.0
                 </a>
-                <h1 class="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-6xl">Deploy apps, databases and email on <span class="text-green-400">your own servers</span></h1>
+                <h1 class="mt-6 text-4xl/tight! font-semibold tracking-tight text-white sm:text-6xl/tight!">Deploy apps, databases and email on <span class="text-green-400">your own servers</span></h1>
                 <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-400">{{ $product }} turns any VPS into your own cloud: Git deploys, managed databases, automatic HTTPS and a built-in mail server, without per-seat pricing.</p>
                 <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <a href="#plans" class="w-full rounded-lg bg-green-500 px-6 py-3 text-sm font-semibold text-green-950 hover:bg-green-400 sm:w-auto">See plans</a>
@@ -80,7 +80,7 @@
 
         {{-- Features --}}
         <section id="features" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
-            <h2 class="text-center text-3xl font-semibold tracking-tight text-white">Everything to run production</h2>
+            <h2 class="text-center text-3xl/tight! font-semibold tracking-tight text-white">Everything to run production</h2>
             <p class="mx-auto mt-3 max-w-xl text-center text-slate-400">Built on Coolify and kept up to date with it every day, with email and security added on top.</p>
             <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($features as [$title, $text, $icon])
@@ -98,7 +98,7 @@
         {{-- Plans --}}
         <section id="plans" class="scroll-mt-20 border-y border-white/[0.06] bg-white/[0.02]">
             <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-                <h2 class="text-center text-3xl font-semibold tracking-tight text-white">Plans</h2>
+                <h2 class="text-center text-3xl/tight! font-semibold tracking-tight text-white">Plans</h2>
                 <p class="mx-auto mt-3 max-w-xl text-center text-slate-400">Self-host for free, or let us run it for you. Prices in Indian rupees.</p>
                 <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     @foreach ($plans as $plan)
@@ -131,7 +131,7 @@
 
         {{-- Open source --}}
         <section id="open-source" class="mx-auto max-w-4xl scroll-mt-20 px-4 py-20 text-center sm:px-6">
-            <h2 class="text-3xl font-semibold tracking-tight text-white">Open source, on GitHub</h2>
+            <h2 class="text-3xl/tight! font-semibold tracking-tight text-white">Open source, on GitHub</h2>
             <p class="mx-auto mt-3 max-w-xl text-slate-400">The full source is public under the Apache-2.0 license. Read it, fork it, or install it on your server with one command.</p>
             <div class="mt-8 flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#060a14] p-2 pl-4 text-left">
                 <code class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap py-2 font-mono text-sm text-green-300">{{ $installCommand }}</code>
@@ -147,7 +147,7 @@
                 <img src="{{ $developerUrl }}.png?size=200" alt="RoastCoder" class="size-28 shrink-0 rounded-2xl border border-white/10" loading="lazy">
                 <div>
                     <p class="text-sm font-medium text-green-400">About the developer</p>
-                    <h2 class="mt-1 text-2xl font-semibold text-white">Built by RoastCoder at StandaloneCoders</h2>
+                    <h2 class="mt-1 text-2xl/tight! font-semibold text-white">Built by RoastCoder at StandaloneCoders</h2>
                     <p class="mt-3 text-slate-400">StandaloneCoders builds web apps, platforms and AI tools for businesses. {{ $product }} is the platform we use to host our own client projects, opened up so anyone can run it.</p>
                     <div class="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
                         <a href="{{ $developerUrl }}" class="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">GitHub profile</a>
