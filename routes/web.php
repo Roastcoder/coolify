@@ -111,6 +111,7 @@ use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
 use App\Livewire\Settings\Index as SettingsIndex;
+use App\Livewire\Settings\MailServer;
 use App\Livewire\Settings\Updates as SettingsUpdates;
 use App\Livewire\SettingsBackup;
 use App\Livewire\SettingsEmail;
@@ -274,6 +275,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
     Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
+    // Fork-only: built-in mail server.
+    Route::get('/settings/mail-server', MailServer::class)->name('settings.mail-server');
     Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
     Route::get('/settings/oauth/{provider}', SettingsOauth::class)
         ->where('provider', '[A-Za-z0-9_-]+')

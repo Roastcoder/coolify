@@ -19,6 +19,8 @@ use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
 use App\Models\InstanceSettings;
+use App\Models\MailDomain;
+use App\Services\MailServer;
 use App\Services\ScheduledJobDeliveryService;
 use Cron\CronExpression;
 use Illuminate\Console\Scheduling\Schedule;
@@ -68,6 +70,12 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping(60)
             ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
+        // Fork-only: keep the built-in mail server's certificate in step with Traefik's renewals.
+        $this->scheduleInstance->call(fn () => app(MailServer::class)->syncCertificate())
+            ->name('mail-server:sync-certificate')
+            ->daily()
+            ->onOneServer()
+            ->when(fn () => MailDomain::exists());
         $this->scheduleInstance->command('cleanup:database-import-uploads')->hourly()->onOneServer();
         $this->scheduleInstance->command('dns:release-orphaned-records')
             ->hourly()
