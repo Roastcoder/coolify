@@ -347,7 +347,7 @@
         <link rel="icon" href="{{ asset('standalonecoders-favicon.png') }}" sizes="64x64" type="image/png" />
         <link rel="icon" href="{{ asset('standalonecoders-mark.svg') }}" type="image/svg+xml" />
     @endenv
-    <link rel="apple-touch-icon" href="{{ asset('standalonecoders-apple-touch-icon.png') }}" />
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
     <meta name="apple-mobile-web-app-title" content="{{ config('custom_build.product_name') }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}">

@@ -16,7 +16,7 @@ test('base layout links the app icons and web manifest', function () {
         ->assertSuccessful()
         ->assertSee('<link rel="apple-touch-icon" href="'.asset('apple-touch-icon.png').'" />', false)
         ->assertSee('<link rel="manifest" href="'.asset('site.webmanifest').'" />', false)
-        ->assertSee('<meta name="apple-mobile-web-app-title" content="Coolify" />', false);
+        ->assertSee('<meta name="apple-mobile-web-app-title" content="'.config('custom_build.product_name').'" />', false);
 });
 
 test('icon files are opaque pngs with the required sizes', function (string $file, int $size) {
@@ -44,7 +44,7 @@ test('favicon ico contains 16, 32 and 48 pixel images', function () {
 test('web manifest lists the pwa icons', function () {
     $manifest = json_decode(file_get_contents(public_path('site.webmanifest')), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($manifest['name'])->toBe('Coolify')
+    expect($manifest['name'])->toBe('StandaloneCoders Cloud')
         ->and($manifest['display'])->toBe('standalone')
         ->and(collect($manifest['icons'])->map(fn (array $icon) => [$icon['src'], $icon['sizes'], $icon['purpose'] ?? 'any'])->all())
         ->toBe([
