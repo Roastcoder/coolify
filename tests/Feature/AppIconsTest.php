@@ -48,12 +48,12 @@ test('web manifest lists the pwa icons', function () {
         ->and($manifest['display'])->toBe('standalone')
         ->and(collect($manifest['icons'])->map(fn (array $icon) => [$icon['src'], $icon['sizes'], $icon['purpose'] ?? 'any'])->all())
         ->toBe([
-            ['/icon-192.png', '192x192', 'any'],
-            ['/icon-512.png', '512x512', 'any'],
-            ['/icon-maskable-512.png', '512x512', 'maskable'],
+            ['/icon-192.png?v=2', '192x192', 'any'],
+            ['/icon-512.png?v=2', '512x512', 'any'],
+            ['/icon-maskable-512.png?v=2', '512x512', 'maskable'],
         ]);
 
     foreach ($manifest['icons'] as $icon) {
-        expect(public_path(ltrim($icon['src'], '/')))->toBeFile();
+        expect(public_path(ltrim(strtok($icon['src'], '?'), '/')))->toBeFile();
     }
 });
