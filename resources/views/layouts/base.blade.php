@@ -349,7 +349,7 @@
     @endenv
     <link rel="apple-touch-icon" href="{{ asset('standalonecoders-apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
-    <meta name="apple-mobile-web-app-title" content="Coolify" />
+    <meta name="apple-mobile-web-app-title" content="{{ config('custom_build.product_name') }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
     <script>
