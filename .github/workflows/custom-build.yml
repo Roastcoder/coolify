@@ -1,10 +1,12 @@
 name: StandaloneCoders Cloud - Build Image
 
-# Builds the app into ghcr.io/roastcoder/standalonecoders-cloud:latest
+# Builds the app into ghcr.io/roastcoder/standalonecoders-cloud:latest.
+# A pushed version tag (v1.0.0) also publishes the image as :v1.0.0.
 
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
     paths-ignore:
       - "*.md"
       - templates/**
@@ -15,7 +17,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: custom-build
+  group: custom-build-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -87,8 +89,6 @@ jobs:
       - name: Publish multi-arch tags
         run: |
           IMAGE="${REGISTRY}/${GITHUB_REPOSITORY,,}"
-          docker buildx imagetools create \
-            "${IMAGE}:${GITHUB_SHA}-amd64" \
-            "${IMAGE}:${GITHUB_SHA}-aarch64" \
-            --tag "${IMAGE}:${GITHUB_SHA::7}" \
-            --tag "${IMAGE}:latest"
+          TAGS=(--tag "${IMAGE}:${GITHUB_SHA::7}" --tag "${IMAGE}:latest")
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then TAGS+=(--tag "${IMAGE}:${GITHUB_REF_NAME}"); fi
+          docker buildx imagetools create "${IMAGE}:${GITHUB_SHA}-amd64" "${IMAGE}:${GITHUB_SHA}-aarch64" "${TAGS[@]}"
