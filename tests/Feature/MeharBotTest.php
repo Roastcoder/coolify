@@ -137,3 +137,15 @@ it('opens a loan file straight away when the loan number matches exactly', funct
 
     expect(($this->bot)()->handle('mehcar 0737')[0])->toContain('Loan file')->toContain('Applicant: Jaygopal');
 });
+
+it('checks challans with the chassis and engine numbers from the RC', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/external/surepass/rc-full' => Http::response(['data' => ['vehicle_chasi_number' => 'CH123', 'vehicle_engine_number' => 'EN456']]),
+        'mehar.test/api/external/surepass/challan' => Http::response(['data' => ['challan_details' => [['challan_date' => '2026-10-01', 'amount' => 1500, 'challan_status' => 'Pending']]]]),
+    ]);
+    ($this->bot)()->handle('4');
+
+    expect(($this->bot)()->handle('rj60 hs 6517')[0])->toContain('1 challan(s)')->toContain('₹1,500');
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/challan') && $r['rc_number'] === 'RJ60HS6517' && $r['chassis_number'] === 'CH123' && $r['engine_number'] === 'EN456');
+});

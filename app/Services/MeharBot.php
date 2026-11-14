@@ -469,7 +469,19 @@ class MeharBot
     private function challanCheck(string $vehicle): void
     {
         $vehicle = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $vehicle));
-        $response = $this->authed()?->post('/api/external/surepass/challan', ['rc_number' => $vehicle]);
+        // The challan service also needs the chassis and engine numbers: take them from the RC (cached by the backend).
+        $rc = $this->authed()?->post('/api/external/surepass/rc-full', ['id_number' => $vehicle]);
+        if (! $rc) {
+            return;
+        }
+        $chassis = $rc->json('data.vehicle_chasi_number') ?? $rc->json('data.chassis_number');
+        $engine = $rc->json('data.vehicle_engine_number') ?? $rc->json('data.engine_number');
+        if (blank($chassis) || blank($engine)) {
+            $this->say("The RC for {$vehicle} has no chassis or engine number, so challans can't be checked.\n\n*0* Back");
+
+            return;
+        }
+        $response = $this->authed()?->post('/api/external/surepass/challan', ['rc_number' => $vehicle, 'chassis_number' => $chassis, 'engine_number' => $engine]);
         if (! $response) {
             return;
         }
