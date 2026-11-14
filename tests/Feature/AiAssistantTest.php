@@ -223,11 +223,40 @@ it('answers the common commands instantly without the AI', function () {
     $assistant = new AiAssistant;
     $conversation = conversationFor($this->admin);
 
-    expect($assistant->handle($conversation, 'help'))->toContain('*status*')
+    expect($assistant->handle($conversation, 'help'))->toContain('Projects and apps')
         ->and($assistant->handle($conversation, 'Status'))->toStartWith('Summary: 0 server(s)')
         ->and($assistant->handle($conversation, 'down'))->toBe('Everything is running.')
         ->and($assistant->handle($conversation, 'Appliction list'))->toBe('No apps found.')
         ->and($assistant->handle($conversation, 'list'))->toBe('No apps found.');
+    Http::assertNothingSent();
+});
+
+it('walks the WhatsApp menu from projects to an app and holds a restart for the password and a YES', function () {
+    Http::fake();
+    $assistant = new class extends AiAssistant
+    {
+        protected function listResources(User $user): array
+        {
+            return [['name' => 'main', 'uuid' => 's1', 'applications' => [
+                ['uuid' => 'a1', 'name' => 'noida-haat', 'status' => 'running:healthy', 'domains' => 'https://shop.test', 'project' => 'Noida Haat'],
+                ['uuid' => 'a2', 'name' => 'mehar-api', 'status' => 'exited', 'domains' => null, 'project' => 'Mehar'],
+            ], 'databases' => [['uuid' => 'd1', 'name' => 'noida-db', 'status' => 'running:healthy', 'project' => 'Noida Haat']], 'services' => []]];
+        }
+    };
+    $conversation = conversationFor($this->admin);
+    $send = fn (string $text) => $assistant->handle($conversation->fresh(), $text);
+
+    expect($send('menu'))->toContain('2. 📁 Projects and apps')
+        ->and($send('2'))->toContain("1. 🔴 *Mehar* (1 app) - 1 down\n2. 🟢 *Noida Haat* (1 app, 1 db)")
+        ->and($send('2'))->toContain("1. 🟢 noida-haat (app)\n2. 🟢 noida-db (db)")
+        ->and($send('1'))->toContain("Domain: https://shop.test\n\n1. 📜 Logs (last 30 lines)\n2. 🔄 Restart\n3. 🚀 Redeploy\n4. ⏹ Stop\n0. ⬅ Back")
+        ->and($send('2'))->toBe("Restart *noida-haat*?\nTo allow, send: unlock <your access password>, then reply YES.")
+        ->and($conversation->fresh()->pending_action['calls'][0])->toBe(['id' => 'menu', 'name' => 'restart_application', 'input' => ['uuid' => 'a1']])
+        ->and($send('no'))->toBe('Cancelled.')
+        ->and($conversation->fresh()->pending_action)->toBeNull()
+        ->and($send('0'))->toContain('📁 *Noida Haat*')
+        ->and($send('0'))->toContain('📁 *Your projects*')
+        ->and($send('9'))->toBe('No option 9. Send *menu* to start again.');
     Http::assertNothingSent();
 });
 

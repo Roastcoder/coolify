@@ -10,6 +10,8 @@ use App\Models\Server;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -68,7 +70,7 @@ class AiAssistant
         if (preg_match('/^\/?unlock\s+(.+)$/is', $text, $match)) {
             return $this->unlock($conversation, trim($match[1]));
         }
-        if (! $conversation->pending_action && ($quick = $this->quickReply($conversation->user, $text)) !== null) {
+        if (! $conversation->pending_action && ($quick = $this->quickReply($conversation, $text)) !== null) {
             return $quick;
         }
         if (! $this->isConfigured()) {
@@ -82,6 +84,13 @@ class AiAssistant
             $approved = (bool) preg_match('/^(yes|y|confirm|allow|ok|run it)[.!]?$/i', $text);
             if ($approved && $this->needsPassword($conversation) && ! $conversation->isUnlocked()) {
                 return 'Locked. First send: unlock <your access password>. Then reply YES.';
+            }
+            // An action picked from the menu runs without the AI.
+            if (! empty($pending['menu'])) {
+                $conversation->update(['pending_action' => null]);
+                $call = $pending['calls'][0];
+
+                return $approved ? Str::limit($this->runTool($conversation->user, $call['name'], $call['input']), 1500) : 'Cancelled.';
             }
             $results = $pending['results'];
             foreach ($pending['calls'] as $call) {
@@ -150,33 +159,165 @@ class AiAssistant
         return $reply ?: 'Done.';
     }
 
-    /** Instant answers without the AI for the common questions. Null when the AI should answer. */
-    private function quickReply(?User $user, string $text): ?string
+    /**
+     * Instant answers without the AI: a numbered menu (main menu, projects, one project, one resource, its actions)
+     * and the common commands. Null when the AI should answer. The open menu level is kept in the cache, so a
+     * reply with a number picks from the menu that was sent last.
+     */
+    private function quickReply(AiConversation $conversation, string $text): ?string
     {
+        $user = $conversation->user;
         $command = strtolower(trim($text, " \t\n\r\0\x0B/.!?"));
-        if (in_array($command, ['help', 'menu', 'hi', 'hello', 'hey'], true)) {
-            return "Instant commands:\n*status* - summary of everything\n*apps* - every app and its status\n*down* - what is not running\n\nAsk anything else in your own words and the AI answers (slower).";
+        $key = "ai-menu:{$conversation->id}";
+        $menu = Cache::get($key);
+        $show = function (array $state, string $reply) use ($key): string {
+            Cache::put($key, $state, now()->addHour());
+
+            return $reply;
+        };
+        $mainMenu = fn (): string => $show(['level' => 'main'], "*Menu*\n1. 📊 Status of everything\n2. 📁 Projects and apps\n3. 🔴 What is down\n\nReply with a number. Send *menu* any time, *0* to go back. Or type a question in your own words for the AI.");
+
+        if (in_array($command, ['help', 'menu', 'hi', 'hello', 'hey', 'start'], true) || ($command === '0' && in_array($menu['level'] ?? 'main', ['main', 'projects'], true))) {
+            return $mainMenu();
         }
-        // "app list", "list", "application list" and typos like "appliction" all mean apps.
-        if (preg_match('/^(list|ap+l?\w*( list)?|list( of)? ap+l?\w*)$/', $command)) {
+        // "app list", "list", "projects", "application list" and typos like "appliction" all mean apps.
+        if (preg_match('/^(list|projects?|ap+l?\w*( list)?|list( of)? ap+l?\w*)$/', $command)) {
             $command = 'apps';
         }
         if (! $user) {
             return null;
         }
-        if (! in_array($command, ['status', 'servers', 'apps', 'down', 'health'], true)) {
-            $wanted = preg_replace('/[^a-z0-9]/', '', $command);
-
-            // Only a one-word message can be a resource name; anything else goes to the AI.
-            return str_contains($command, ' ') || strlen($wanted) < 4 ? null : $this->statusOf($this->listResources($user), $wanted);
+        if ($command === 'status' || $command === 'servers' || $command === 'health' || ($command === '1' && ($menu['level'] ?? null) === 'main')) {
+            return $this->summary($this->listResources($user));
         }
-        $servers = $this->listResources($user);
-        if ($command === 'status' || $command === 'servers' || $command === 'health') {
-            return $this->summary($servers);
-        }
-        $lines = $this->resourceLines($servers, onlyDown: $command === 'down');
+        if ($command === 'down' || ($command === '3' && ($menu['level'] ?? null) === 'main')) {
+            $lines = $this->resourceLines($this->listResources($user), onlyDown: true);
 
-        return $lines === '' ? ($command === 'down' ? 'Everything is running.' : 'No apps found.') : $lines;
+            return $lines === '' ? 'Everything is running.' : $lines;
+        }
+        if ($command === 'apps' || ($command === '2' && ($menu['level'] ?? null) === 'main') || ($command === '0' && ($menu['level'] ?? null) === 'project')) {
+            [$reply, $projects] = $this->projectMenu($this->listResources($user));
+
+            return $show(['level' => 'projects', 'items' => $projects], $reply);
+        }
+        if ($command === '0' && ($menu['level'] ?? null) === 'resource') {
+            $command = (string) $menu['project'];
+            $menu = ['level' => 'projects', 'items' => [$command]];
+            $command = '1';
+        }
+        if (ctype_digit($command) && $menu && $menu['level'] !== 'main') {
+            $picked = $menu['items'][(int) $command - 1] ?? null;
+            if ($picked === null) {
+                return 'No option '.$command.'. Send *menu* to start again.';
+            }
+            $servers = $this->listResources($user);
+            if ($menu['level'] === 'projects') {
+                $items = $this->flatResources($servers)->where('project', $picked)->values();
+
+                return $show(['level' => 'project', 'project' => $picked, 'items' => $items->pluck('uuid')->all()], $this->projectView($items, $picked));
+            }
+            if ($menu['level'] === 'project') {
+                $resource = $this->flatResources($servers)->firstWhere('uuid', $picked);
+                if (! $resource) {
+                    return 'That resource is gone. Send *apps* for the list.';
+                }
+                $actions = $this->actionsFor($resource);
+
+                return $show(['level' => 'resource', 'project' => $menu['project'], 'uuid' => $picked, 'name' => $resource['name'], 'items' => array_keys($actions)], $this->resourceView($resource, $actions));
+            }
+
+            return $this->menuAction($conversation, $picked, $menu['uuid'], $menu['name']);
+        }
+        $wanted = preg_replace('/[^a-z0-9]/', '', $command);
+
+        // Only a one-word message can be a resource name; anything else goes to the AI.
+        return str_contains($command, ' ') || strlen($wanted) < 4 ? null : $this->statusOf($this->listResources($user), $wanted);
+    }
+
+    /** @return Collection<int, array{kind: string, uuid: string, name: string, status: string, project: string, domains: ?string}> */
+    private function flatResources(array $servers): Collection
+    {
+        return collect($servers)->flatMap(fn (array $server) => collect(['applications', 'databases', 'services'])
+            ->flatMap(fn (string $kind) => collect($server[$kind])->map(fn (array $item) => [
+                'kind' => $kind, 'uuid' => $item['uuid'], 'name' => $item['name'], 'status' => (string) $item['status'],
+                'project' => $item['project'] ?? 'Other', 'domains' => $item['domains'] ?? null,
+            ])));
+    }
+
+    private function icon(string $status): string
+    {
+        return str_starts_with($status, 'running') ? '🟢' : '🔴';
+    }
+
+    /**
+     * The numbered list of projects, and the project names in that order.
+     *
+     * @return array{0: string, 1: array<int, string>}
+     */
+    private function projectMenu(array $servers): array
+    {
+        $projects = $this->flatResources($servers)->groupBy('project')->sortKeys();
+        if ($projects->isEmpty()) {
+            return ['No apps found.', []];
+        }
+        $lines = $projects->values()->map(function (Collection $items, int $i) use ($projects): string {
+            $down = $items->reject(fn (array $item) => str_starts_with($item['status'], 'running'))->count();
+            $counts = collect(['applications' => 'app', 'databases' => 'db', 'services' => 'service'])
+                ->map(fn (string $label, string $kind) => ($n = $items->where('kind', $kind)->count()) ? $n.' '.$label.($n > 1 ? 's' : '') : null)
+                ->filter()->implode(', ');
+
+            return ($i + 1).'. '.($down ? '🔴' : '🟢').' *'.$projects->keys()[$i].'* ('.$counts.')'.($down ? " - {$down} down" : '');
+        });
+
+        return ["📁 *Your projects*\n".$lines->implode("\n")."\n\nReply with a number to open a project. *0* Back", $projects->keys()->all()];
+    }
+
+    /** One project: its resources, numbered in the order of $items. */
+    private function projectView(Collection $items, string $project): string
+    {
+        $kinds = ['applications' => 'app', 'databases' => 'db', 'services' => 'service'];
+        $lines = $items->map(fn (array $item, int $i) => ($i + 1).'. '.$this->icon($item['status']).' '.$item['name'].' ('.$kinds[$item['kind']].')'
+            .(str_starts_with($item['status'], 'running') ? '' : " - {$item['status']}"));
+
+        return "📁 *{$project}*\n".($lines->isEmpty() ? 'Nothing here any more.' : $lines->implode("\n"))."\n\nReply with a number to open one. *0* Back";
+    }
+
+    /**
+     * What the menu offers for one resource. Restart, redeploy and stop are for apps, and only for the owner.
+     *
+     * @return array<string, string>
+     */
+    private function actionsFor(array $resource): array
+    {
+        $actions = $this->admin ? ['get_logs' => '📜 Logs (last 30 lines)'] : [];
+        if ($this->admin && $resource['kind'] === 'applications') {
+            $actions += ['restart_application' => '🔄 Restart', 'deploy_application' => '🚀 Redeploy', 'stop_application' => '⏹ Stop'];
+        }
+
+        return $actions;
+    }
+
+    /** @param  array<string, string>  $actions */
+    private function resourceView(array $resource, array $actions): string
+    {
+        $options = collect(array_values($actions))->map(fn (string $label, int $i) => ($i + 1).'. '.$label)->push('0. ⬅ Back');
+
+        return $this->icon($resource['status'])." *{$resource['name']}*\nStatus: {$resource['status']}\nProject: {$resource['project']}"
+            .($resource['domains'] ? "\nDomain: {$resource['domains']}" : '')."\n\n".$options->implode("\n");
+    }
+
+    /** Runs a menu action: logs at once; restart, redeploy and stop wait for a YES (and the password on WhatsApp). */
+    private function menuAction(AiConversation $conversation, string $tool, string $uuid, string $name): string
+    {
+        if ($tool === 'get_logs') {
+            return Str::limit($this->runTool($conversation->user, 'get_logs', ['uuid' => $uuid, 'lines' => 30]), 3500);
+        }
+        $conversation->update(['pending_action' => ['results' => [], 'calls' => [['id' => 'menu', 'name' => $tool, 'input' => ['uuid' => $uuid]]], 'menu' => true]]);
+        $verb = ['restart_application' => 'Restart', 'deploy_application' => 'Redeploy', 'stop_application' => 'Stop'][$tool];
+
+        return "{$verb} *{$name}*?\n".($this->needsPassword($conversation) && ! $conversation->isUnlocked()
+            ? 'To allow, send: unlock <your access password>, then reply YES.'
+            : 'Reply YES to allow, or NO.');
     }
 
     /** A one-word message that names a resource gets its real status at once, so the AI never has to guess it. */
@@ -416,16 +557,16 @@ class AiAssistant
         return $user->teams()->pluck('teams.id')->all();
     }
 
-    private function listResources(User $user): array
+    protected function listResources(User $user): array
     {
         return Server::query()->whereIn('team_id', $this->teamIds($user))->get()->map(fn (Server $server): array => [
             'uuid' => $server->uuid,
             'name' => $server->name,
             'ip' => $server->ip,
             'reachable' => (bool) $server->settings?->is_reachable,
-            'applications' => $server->applications()->map(fn ($app) => ['uuid' => $app->uuid, 'name' => $app->name, 'status' => $app->status, 'domains' => $app->fqdn])->values(),
-            'databases' => $server->databases()->map(fn ($db) => ['uuid' => $db->uuid, 'name' => $db->name, 'type' => class_basename($db), 'status' => $db->status])->values(),
-            'services' => $server->services()->get()->map(fn ($service) => ['uuid' => $service->uuid, 'name' => $service->name, 'status' => $service->status])->values(),
+            'applications' => $server->applications()->map(fn ($app) => ['uuid' => $app->uuid, 'name' => $app->name, 'status' => $app->status, 'domains' => $app->fqdn, 'project' => $app->environment?->project?->name])->values(),
+            'databases' => $server->databases()->map(fn ($db) => ['uuid' => $db->uuid, 'name' => $db->name, 'type' => class_basename($db), 'status' => $db->status, 'project' => $db->environment?->project?->name])->values(),
+            'services' => $server->services()->get()->map(fn ($service) => ['uuid' => $service->uuid, 'name' => $service->name, 'status' => $service->status, 'project' => $service->environment?->project?->name])->values(),
         ])->all();
     }
 
