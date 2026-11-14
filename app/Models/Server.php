@@ -910,7 +910,7 @@ class Server extends BaseModel
         }
 
         $container = self::PROXY_ERROR_PAGE_CONTAINER;
-        if (! $this->usesProxyErrorPage() && $this->maintenanceResources()->isEmpty()) {
+        if (! $this->usesProxyErrorPage() && $this->maintenanceResources()->isEmpty() && ! $this->servesPanel()) {
             instant_remote_process(["docker rm -f $container >/dev/null 2>&1 || true"], $this);
 
             return;
@@ -922,6 +922,9 @@ class Server extends BaseModel
 
         instant_remote_process(["mkdir -p $path"], $this);
         $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
+        if ($this->servesPanel()) {
+            $this->uploadProxyFile("$path/panel-updating.html", view('proxy.panel-updating')->render());
+        }
         instant_remote_process([
             dockerNetworkEnsureCommand('coolify'),
             "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
@@ -1094,6 +1097,16 @@ class Server extends BaseModel
         return $caddyfile."\n";
     }
 
+    /**
+     * True when this server's Traefik routes the panel's own domain.
+     */
+    public function servesPanel(): bool
+    {
+        return $this->proxyType() === ProxyTypes::TRAEFIK->value && ! $this->isSwarm()
+            && ! (isCloud() && $this->id !== 0) && $this->isLocalhost()
+            && filled(InstanceSettings::query()->whereKey(0)->value('fqdn'));
+    }
+
     public function setupDynamicProxyConfiguration()
     {
         $settings = instanceSettings();
@@ -1119,11 +1132,20 @@ class Server extends BaseModel
                             'gzip' => [
                                 'compress' => true,
                             ],
+                            // While the panel restarts after an update, show a page instead of Bad Gateway.
+                            'panel-updating' => [
+                                'errors' => [
+                                    'status' => ['502-504'],
+                                    'service' => 'panel-error-pages',
+                                    'query' => '/panel-updating.html',
+                                ],
+                            ],
                         ],
                         'routers' => [
                             'coolify-http' => [
                                 'middlewares' => [
                                     0 => 'gzip',
+                                    1 => 'panel-updating',
                                 ],
                                 'entryPoints' => [
                                     0 => 'http',
@@ -1147,6 +1169,9 @@ class Server extends BaseModel
                             ],
                         ],
                         'services' => [
+                            'panel-error-pages' => [
+                                'loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]],
+                            ],
                             'coolify' => [
                                 'loadBalancer' => [
                                     'servers' => [
@@ -1186,6 +1211,7 @@ class Server extends BaseModel
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
                         'middlewares' => [
                             0 => 'gzip',
+                            1 => 'panel-updating',
                         ],
                         'entryPoints' => [
                             0 => 'https',
@@ -1222,6 +1248,7 @@ class Server extends BaseModel
                     "mkdir -p $dynamic_config_path",
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
                 ], $this);
+                $this->setupProxyErrorPageContainer();
             }
         } elseif ($this->proxyType() === 'CADDY') {
             $file = "$dynamic_config_path/coolify.caddy";

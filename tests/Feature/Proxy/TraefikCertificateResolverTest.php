@@ -88,12 +88,22 @@ test('coolify dashboard routes follow the server certificate resolver', function
 
     $command = '';
     Process::assertRan(function ($process) use (&$command) {
-        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $script = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        if (! str_contains($script, 'coolify.yaml')) {
+            return false;
+        }
+        $command = $script;
 
-        return str_contains($command, 'coolify.yaml');
+        return true;
     });
     preg_match("/echo '([A-Za-z0-9+\/=]+)' \| base64 -d/", $command, $matches);
-    $routers = Yaml::parse(base64_decode($matches[1]))['http']['routers'];
+    $http = Yaml::parse(base64_decode($matches[1]))['http'];
+    $routers = $http['routers'];
+
+    // A panel restart shows the updating page instead of Bad Gateway.
+    expect($routers['coolify-https']['middlewares'])->toContain('panel-updating')
+        ->and($http['middlewares']['panel-updating']['errors'])->toBe(['status' => ['502-504'], 'service' => 'panel-error-pages', 'query' => '/panel-updating.html'])
+        ->and($http['services']['panel-error-pages']['loadBalancer']['servers'][0]['url'])->toBe('http://coolify-proxy-error-pages:80');
 
     foreach (['coolify-https', 'coolify-reverb-wss', 'coolify-terminal-wss'] as $router) {
         expect($routers[$router])->toHaveKey('tls')
