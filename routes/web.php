@@ -26,6 +26,7 @@ use App\Http\Controllers\WebmailController;
 use App\Http\Controllers\WebmailPasswordController;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Ai\Editor as AiEditor;
 use App\Livewire\Ai\Index as AiIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -319,6 +320,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Fork-only: AI assistant and WhatsApp gateway.
         Route::get('/settings/ai', SettingsAiAssistant::class)->name('settings.ai');
         Route::get('/ai', AiIndex::class)->name('ai.index');
+        Route::get('/code', AiEditor::class)->name('ai.editor');
         Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
         Route::get('/settings/oauth/{provider}', SettingsOauth::class)
             ->where('provider', '[A-Za-z0-9_-]+')

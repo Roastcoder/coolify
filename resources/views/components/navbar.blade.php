@@ -123,6 +123,7 @@
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
                         ]],
                         ['label' => 'AI', 'icon' => 'brain', 'href' => route('ai.index'), 'active' => request()->is('ai'), 'visible' => $teamWide && isInstanceAdmin()],
+                        ['label' => 'Code', 'icon' => 'code', 'href' => route('ai.editor'), 'active' => request()->is('code'), 'visible' => $teamWide && isInstanceAdmin()],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [

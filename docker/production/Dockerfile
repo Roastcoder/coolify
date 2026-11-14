@@ -200,6 +200,8 @@ COPY --chown=www-data:www-data routes ./routes
 COPY --chown=www-data:www-data storage ./storage
 COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data resources/views ./resources/views
+# Fork-only: the built-in WhatsApp gateway, built on the host by App\Services\WhatsappGateway.
+COPY --chown=www-data:www-data resources/whatsapp ./resources/whatsapp
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/

@@ -1,15 +1,18 @@
 <?php
 
 use App\Jobs\AiWhatsappReplyJob;
+use App\Livewire\Ai\Editor;
 use App\Livewire\Ai\Index as AiPage;
 use App\Livewire\Settings\AiAssistant as AiSettingsPage;
 use App\Models\AiConversation;
 use App\Models\AiSettings;
 use App\Models\InstanceSettings;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\WhatsappChannel;
 use App\Services\AiAssistant;
+use App\Services\HostFilesystemService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -154,4 +157,27 @@ it('opens the settings page on a fresh install', function () {
 
     $this->actingAs($this->admin)->withSession(['currentTeam' => $this->rootTeam]);
     Livewire::test(AiSettingsPage::class)->assertOk()->assertSet('model', 'claude-opus-5-5');
+});
+
+it('keeps the code editor locked until the access password is given', function () {
+    $this->actingAs($this->admin)->withSession(['currentTeam' => $this->rootTeam]);
+
+    $editor = Livewire::test(Editor::class)->assertSee('Unlock root access');
+    expect($editor->instance()->listDir('/etc'))->toBe(['error' => 'Root access is locked. Enter the access password.']);
+
+    $editor->set('unlockPassword', 'open-sesame-42')->call('unlock')->assertDontSee('Unlock root access');
+    expect($editor->instance()->listDir('/etc/../root'))->toBe(['error' => 'Invalid path.'])
+        ->and($editor->instance()->readFile('/etc/hosts'))->toBe(['error' => 'Open a workspace first.'])
+        ->and($editor->instance()->openWorkspace('server:not-mine'))->toHaveKey('error');
+
+    $this->actingAs($this->employee)->withSession(['currentTeam' => $this->employeeTeam]);
+    Livewire::test(Editor::class)->assertRedirect(route('dashboard'));
+});
+
+it('runs server workspace commands on the host, not in a container', function () {
+    $server = Server::factory()->make();
+    $files = new HostFilesystemService($server, '/srv/app');
+
+    expect($files->buildListCommand('/srv/app'))->toStartWith('sh -c ')->not->toContain('docker exec')
+        ->and($files->defaultRoot())->toBe('/srv/app');
 });
