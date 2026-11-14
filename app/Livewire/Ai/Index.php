@@ -119,7 +119,7 @@ class Index extends Component
         } elseif ($result['kind'] === 'rewrite') {
             $this->content = $result['content'];
             $this->instruction = '';
-            $this->dispatch('success', 'Claude changed the file. Review it, then Save.');
+            $this->dispatch('success', 'The AI changed the file. Review it, then Save.');
         } else {
             $this->log[] = ['role' => 'assistant', 'text' => $result['text']];
         }

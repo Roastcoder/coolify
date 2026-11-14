@@ -173,7 +173,7 @@ class AiAssistant
 
                 return match ($e->response->status()) {
                     401 => 'The Claude API key is not valid. Check Settings > AI assistant.',
-                    429 => 'Claude is rate limited right now. Try again in a minute.',
+                    429 => 'The AI is busy right now. Try again in a minute.',
                     default => 'AI error ('.$e->response->status().'): '.Str::limit((string) data_get($e->response->json(), 'error.message', ''), 200),
                 };
             } catch (ConnectionException) {
@@ -187,7 +187,7 @@ class AiAssistant
             if ($response['stop_reason'] === 'refusal') {
                 $conversation->update(['messages' => $messages]);
 
-                return 'Claude declined this request.';
+                return 'The AI declined this request.';
             }
             if ($response['stop_reason'] !== 'tool_use') {
                 $conversation->update(['messages' => $messages]);
@@ -212,7 +212,7 @@ class AiAssistant
                 $conversation->update(['messages' => $messages, 'pending_action' => ['results' => $results, 'calls' => $guarded]]);
                 $lead = $this->text($response);
 
-                return trim($lead."\n\n".'Claude wants to:'."\n".$this->describe($guarded)."\n\n"
+                return trim($lead."\n\n".'The AI wants to:'."\n".$this->describe($guarded)."\n\n"
                     .($this->needsPassword($conversation) && ! $conversation->isUnlocked() ? 'To allow, send: unlock <your access password>, then reply YES.' : 'Reply YES to allow, or NO.'));
             }
 

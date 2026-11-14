@@ -1,6 +1,6 @@
 // Fork-only: the built-in WhatsApp gateway (container coolify-whatsapp), started by App\Services\WhatsappGateway.
 // It links one WhatsApp account through WhatsApp Web (scan the QR code in Settings > AI assistant),
-// forwards incoming chats to Coolify and sends the messages Coolify asks for.
+// forwards incoming chats (and the owner's own "Message yourself" chat) to the app and sends the messages Coolify asks for.
 // Every request in both directions carries the shared secret in the X-Whatsapp-Secret header.
 const http = require('node:http');
 const crypto = require('node:crypto');
@@ -47,17 +47,35 @@ client.on('disconnected', (reason) => {
     setTimeout(() => process.exit(1), 2000);
 });
 
-client.on('message', async (message) => {
-    if (message.fromMe || message.type !== 'chat' || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
+// Texts this gateway is sending: in the owner's "Message yourself" chat they come back as messages from me.
+const outgoing = new Set();
+
+// message_create also fires for messages sent from the linked phone, so the owner can use "Message yourself".
+client.on('message_create', async (message) => {
+    if (message.type !== 'chat' || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
+        return;
+    }
+    if (message.fromMe && outgoing.delete(message.body)) {
         return;
     }
     try {
-        const contact = await message.getContact();
-        await fetch(WEBHOOK_URL, {
+        let number;
+        if (message.fromMe) {
+            const chat = await message.getChat();
+            const self = message.to === message.from || chat.id.user === me || chat.id._serialized === client.info?.wid?._serialized;
+            if (!self) {
+                return; // The owner writing to someone else.
+            }
+            number = me;
+        } else {
+            number = (await message.getContact()).number;
+        }
+        const response = await fetch(WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Whatsapp-Secret': SECRET },
-            body: JSON.stringify({ id: message.id._serialized, number: contact.number || '', body: message.body }),
+            body: JSON.stringify({ id: message.id._serialized, number: number || '', body: message.body }),
         });
+        console.log('Forwarded a message from', number || 'unknown', '->', response.status);
     } catch (error) {
         console.error('Could not forward a message:', error.message);
     }
@@ -107,6 +125,8 @@ http.createServer(async (request, response) => {
             if (!id) {
                 return reply(response, 404, { error: 'This number is not on WhatsApp.' });
             }
+            outgoing.add(String(text || ''));
+            setTimeout(() => outgoing.delete(String(text || '')), 60_000);
             await client.sendMessage(id._serialized, String(text || ''));
             return reply(response, 200, { sent: true });
         }

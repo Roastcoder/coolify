@@ -6,7 +6,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1>AI</h1>
-            <p class="text-sm">Ask Claude to check, deploy and fix your servers and apps, or to change files on a server.</p>
+            <p class="text-sm">Ask the AI to check, deploy and fix your servers and apps, or to change files on a server.</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ route('settings.ai') }}" class="button" {{ wireNavigate() }}>Settings</a>
@@ -47,13 +47,13 @@
                     </div>
                 @endforelse
                 @if ($waiting === 'chat')
-                    <div class="self-start rounded-2xl bg-neutral-100 px-4 py-2.5 text-sm dark:bg-white/[0.05]">Claude is working…</div>
+                    <div class="self-start rounded-2xl bg-neutral-100 px-4 py-2.5 text-sm dark:bg-white/[0.05]">The AI is working…</div>
                 @endif
             </div>
 
             @if ($pending && ! $waiting)
                 <div class="mx-4 mb-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
-                    <p class="font-medium">Claude wants to:</p>
+                    <p class="font-medium">The AI wants to:</p>
                     <pre class="mt-1 whitespace-pre-wrap break-words text-xs">{{ $pending }}</pre>
                     <div class="mt-2 flex gap-2">
                         <x-forms.button wire:click="answer(true)" isHighlighted>Allow</x-forms.button>
@@ -81,8 +81,8 @@
             <x-forms.textarea id="content" useMonacoEditor monacoEditorLanguage="plaintext" rows="20" />
             <form wire:submit="askClaude" class="flex flex-col gap-2 sm:flex-row">
                 <label for="ai-instruction" class="sr-only">Change to make</label>
-                <input id="ai-instruction" wire:model="instruction" placeholder="Tell Claude what to change in this file" class="input flex-1" @disabled(! $configured)>
-                <x-forms.button type="submit" :disabled="! $configured || $waiting">{{ $waiting === 'rewrite' ? 'Claude is editing…' : 'Ask Claude' }}</x-forms.button>
+                <input id="ai-instruction" wire:model="instruction" placeholder="Tell the AI what to change in this file" class="input flex-1" @disabled(! $configured)>
+                <x-forms.button type="submit" :disabled="! $configured || $waiting">{{ $waiting === 'rewrite' ? 'The AI is editing…' : 'Ask AI' }}</x-forms.button>
             </form>
             <div class="flex items-center justify-between gap-3">
                 <p class="text-xs">{{ $loadedPath ? 'Opened '.$loadedPath : 'Open a file or write a new one.' }} <a href="{{ route('ai.editor') }}" class="underline" {{ wireNavigate() }}>Open the full editor</a></p>
