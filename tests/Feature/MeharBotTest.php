@@ -25,6 +25,19 @@ beforeEach(function () {
     $this->bot = fn () => new MeharBot('919000000001', 'https://mehar.test');
 });
 
+/** A stand-in for the Yogii model: intents for the sentences in $intents, a chat answer for anything else. */
+function fakeYogii(array $intents = [], string $answer = 'Yogii here.'): Closure
+{
+    return function (Request $request) use ($intents, $answer) {
+        $last = collect($request['messages'])->last()['content'];
+        if (($request['format'] ?? null) === 'json') {
+            return Http::response(['message' => ['content' => json_encode($intents[$last] ?? ['intent' => 'chat', 'query' => ''])]]);
+        }
+
+        return Http::response(['message' => ['content' => $answer]]);
+    };
+}
+
 function meharLogin(Closure $bot): void
 {
     Http::fake(['mehar.test/api/auth/request-otp' => Http::response(['ok' => true]), 'mehar.test/api/auth/verify-otp' => Http::response(['token' => 'tok-1', 'user' => ['name' => 'Asha', 'role' => 'manager']])]);
@@ -111,10 +124,10 @@ it('routes login and active sessions to the bot, and everyone else as before', f
 it('answers free text at the menu with Yogii', function () {
     AiSettings::current()->update(['model' => AiSettings::LOCAL_PREFIX.'yogii:latest']);
     meharLogin($this->bot);
-    Http::fake(['coolify-ollama:11434/api/chat' => Http::response(['message' => ['content' => 'A hypothecation is the bank lien on the vehicle.']])]);
+    Http::fake(['coolify-ollama:11434/api/chat' => fakeYogii([], 'A hypothecation is the bank lien on the vehicle.')]);
 
     expect(($this->bot)()->handle('what is hypothecation?')[0])->toContain('bank lien')->toContain('*menu*');
-    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'api/chat') && $r['model'] === 'yogii:latest' && ! $r->hasHeader('Authorization'));
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'api/chat') && $r['model'] === 'yogii:latest' && ! isset($r['format']) && ! $r->hasHeader('Authorization'));
 });
 
 it('opens Mehar Advisory from the Yogii menu', function () {
@@ -174,7 +187,10 @@ it('takes a loan or vehicle number typed straight in, and rc/challan/payment com
         'mehar.test/api/payments/applications' => Http::response([['id' => 3, 'loan_number' => 'MEHCAR0737', 'amount' => 1000]]),
     ]);
 
-    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('Loan file MEHCAR0737');
+    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('What do you want for *MEHCAR0737*?')->toContain('*2* Loan PDF');
+    expect(($this->bot)()->handle('1')[0])->toContain('Loan file MEHCAR0737');
+    expect(($this->bot)()->handle('RJ31UA4510')[0])->toContain('*2* RC details')->toContain('*3* Challan check');
+    expect(($this->bot)()->handle('2')[0])->toContain('*Owner:* JAYGOPAL');
     expect(($this->bot)()->handle('rc RJ31UA4510')[0])->toContain('*Owner:* JAYGOPAL');
     expect(($this->bot)()->handle('payment MEHCAR0737')[0])->toContain('Payment applications');
 });
@@ -227,7 +243,7 @@ it('sends a name that finds nothing, or a question, to Yogii', function () {
     meharLogin($this->bot);
     Http::fake([
         'mehar.test/api/loans?search=*' => Http::response(['data' => []]),
-        'coolify-ollama:11434/api/chat' => Http::response(['message' => ['content' => 'Yogii here.']]),
+        'coolify-ollama:11434/api/chat' => fakeYogii(),
     ]);
 
     expect(($this->bot)()->handle('good morning team')[0])->toContain('Yogii here.');
@@ -243,12 +259,42 @@ it('shows saved CIBIL reports to managers only, without pulling new ones', funct
         'mehar.test/uploads/credit-reports/r.pdf' => Http::response('%PDF', 200, ['Content-Type' => 'application/pdf']),
     ]);
 
-    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('*6* CIBIL reports');
+    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('*5* CIBIL reports');
+    expect(($this->bot)()->handle('1')[0])->toContain('*6* CIBIL reports');
     expect(($this->bot)()->handle('6')[0])->toContain('*1* CIBIL · Score 742 · JAYGOPAL · 01 Oct 2026');
     expect(($this->bot)()->handle('1')[0]['filename'])->toBe('CIBIL-MEHCAR0737-1.pdf');
     Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'credit-report') && $r->method() === 'POST');
 
     Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'sales'], 60);
     expect(($this->bot)()->handle('MEHCAR0737')[0])->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('MEHCAR0737 file')[0])->not->toContain('CIBIL');
     expect(($this->bot)()->handle('6')[0])->toContain('Pick a number');
+});
+
+it('lets Yogii read a free sentence and act on it', function () {
+    AiSettings::current()->update(['model' => AiSettings::LOCAL_PREFIX.'yogii:latest']);
+    meharLogin($this->bot);
+    Http::fake([
+        'coolify-ollama:11434/api/chat' => fakeYogii([
+            'bhai jaygopal wali file bhejna' => ['intent' => 'loan', 'query' => 'jaygopal'],
+            'RJ60HS6517 gaadi pe koi chalan pending hai kya' => ['intent' => 'challan', 'query' => 'RJ60HS6517'],
+            'mohan ka payment kab tak aayega' => ['intent' => 'payments', 'query' => ''],
+        ]),
+        'mehar.test/api/loans?search=jaygopal' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737'], ['id' => 8, 'loan_number' => 'MEHCAR0800']]]),
+        'mehar.test/api/external/surepass/rc-full' => Http::response(['data' => ['vehicle_chasi_number' => 'C1', 'vehicle_engine_number' => 'E1']]),
+        'mehar.test/api/external/surepass/challan' => Http::response(['data' => ['challan_details' => []]]),
+    ]);
+
+    expect(($this->bot)()->handle('bhai jaygopal wali file bhejna')[0])->toContain('*Loan files*');
+    // The keyword is spelt "chalan", which the instant rules also know.
+    expect(($this->bot)()->handle('RJ60HS6517 gaadi pe koi chalan pending hai kya')[0])->toContain('No challans found');
+    expect(($this->bot)()->handle('mohan ka payment kab tak aayega')[0])->toContain('Which loan number, vehicle number or name?');
+    expect(Cache::get('mehar-bot:919000000001')['step'])->toBe('find-payment');
+});
+
+it('searches a mobile number typed straight in', function () {
+    meharLogin($this->bot);
+    Http::fake(['mehar.test/api/loans?search=9462394650' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737', 'mobile' => '9462394650']]])]);
+
+    expect(($this->bot)()->handle('9462394650')[0])->toContain('MEHCAR0737');
 });

@@ -69,7 +69,7 @@ class MeharBot
                 $this->forget('Logged out of Mehar Advisory. Send *login* to log in again.');
             } elseif (! isset($this->session['token'])) {
                 $this->login($text);
-            } elseif (in_array($command, ['menu', 'hi', 'hello', 'start', 'login', 'mehar'], true) || ($command === '0' && in_array($this->step(), ['menu', 'find-loan', 'find-payment', 'rc', 'challan', 'loans', 'payments'], true))) {
+            } elseif (in_array($command, ['menu', 'hi', 'hello', 'start', 'login', 'mehar'], true) || ($command === '0' && in_array($this->step(), ['menu', 'find-loan', 'find-payment', 'rc', 'challan', 'loans', 'payments', 'pick'], true))) {
                 $this->menu();
             } elseif ($media || in_array($this->step(), ['upload', 'payment-action'], true) || ! $this->direct($text)) {
                 $this->step($text, $media);
@@ -96,6 +96,7 @@ class MeharBot
             'loan' => $this->loanChoice($text),
             'documents' => $this->documentChoice($text),
             'cibil' => $this->creditReportChoice($text),
+            'pick' => $this->pickChoice($text),
             'upload' => $this->upload($text, $media),
             'find-payment' => $this->findPayments($text),
             'payments' => $this->openFromList($text, fn (string $id) => $this->showPayment($id)),
@@ -110,48 +111,156 @@ class MeharBot
     }
 
     /**
-     * Chat instead of the menu: "jaygopal ki file", "RJ60HS6517 ka challan", "MEHCAR0737 pdf", "payment of MEHCAR0737",
-     * "rc RJ14AB1234". Numbers still pick menu options; anything that is not a search goes on to the screen or to Yogii.
+     * Chat instead of the menu, the user's choice. A bare loan or vehicle number asks what they want for it;
+     * "MEHCAR0737 pdf" or "RJ60HS6517 challan" act at once; any other sentence is read by the Yogii model
+     * ("jaygopal ki file", "who owns RJ14AB1234") and either acted on or answered. Small numbers pick menu options.
      */
     private function direct(string $text): bool
     {
-        // Numbers pick menu options, and a screen waiting for a search or a vehicle number gets the text as typed.
         $lower = Str::lower($text);
         $has = fn (string $words) => (bool) preg_match('/\b('.$words.')\b/u', $lower);
         $waiting = in_array($this->step(), ['find-loan', 'find-payment', 'rc', 'challan'], true);
-        if (ctype_digit($text) || ($waiting && ! $has('rc|challans?|chalan|loan|file|payments?|pay|pdf|download|docs?|documents?|owner'))) {
+        if ($waiting && ! $has('rc|challans?|chalan|loan|file|payments?|pay|pdf|download|docs?|documents?|owner|cibil')) {
             return false;
+        }
+        if (ctype_digit($text)) {
+            // Menu numbers are short; a long number is a mobile or file number to search for.
+            if (strlen($text) < 5) {
+                return false;
+            }
+            $this->findLoans($text);
+
+            return true;
         }
         $vehicle = preg_match('/\b([a-z]{2}\s?\d{1,2}\s?[a-z]{0,3}\s?\d{4})\b/i', $text, $m) ? strtoupper(preg_replace('/\s/', '', $m[1])) : null;
         $code = preg_match('/\b((?=[a-z\-\/]*\d)(?=[\d\-\/]*[a-z])[a-z0-9\-\/]{5,20})\b/i', $text, $m) ? strtoupper($m[1]) : null;
         $identifier = $vehicle ?? $code;
 
-        if ($identifier && $has('challans?|chalan|e-?challan')) {
-            $this->session['step'] = 'challan';
-            $this->challanCheck($identifier);
-        } elseif ($identifier && $has('rc|owner|registration|vahan|rc details')) {
-            $this->session['step'] = 'rc';
-            $this->rcSearch($identifier);
-        } elseif ($identifier && $has('payments?|pay|utr|voucher')) {
-            $this->findPayments($identifier);
-        } elseif ($identifier) {
-            $this->findLoans($identifier);
-            // "MEHCAR0737 pdf" / "… documents" go one step further when the number opened a single file.
-            if (($this->session['step'] ?? null) === 'loan' && $has('pdf|download')) {
-                $this->loanChoice('1');
-            } elseif (($this->session['step'] ?? null) === 'loan' && $has('docs?|documents?|kagaz|papers')) {
-                $this->loanChoice('2');
-            }
-        } elseif ($name = $this->nameIn($lower)) {
-            // A name, alone or in a sentence ("jaygopal ki file", "show loan of ravi kumar"): search, or let Yogii answer.
-            if (! $this->findLoans($name, quiet: true)) {
-                return false;
-            }
-        } else {
-            return false;
+        if ($identifier && strtoupper(preg_replace('/[^A-Za-z0-9\-\/]/', '', $text)) === $identifier) {
+            $this->askWhat($identifier, $vehicle !== null);
+
+            return true;
+        }
+        // Instant: a number with a clear keyword.
+        $intent = match (true) {
+            ! $identifier => null,
+            $has('challans?|chalan|e-?challan') => 'challan',
+            $has('cibil|credit|score') => 'cibil',
+            $has('rc|owner|registration|vahan') => 'rc',
+            $has('payments?|pay|utr|voucher') => 'payments',
+            $has('pdf|download') => 'loan_pdf',
+            $has('docs?|documents?|kagaz|papers') => 'documents',
+            $has('loan|file|details?') => 'loan',
+            default => null,
+        };
+        if ($intent) {
+            $this->act($intent, $identifier);
+
+            return true;
         }
 
+        // Anything else: Yogii reads it. Without the model, a short name is searched and the rest is chat.
+        [$intent, $query] = $this->understand($text) ?? [null, ''];
+        if ($intent === null) {
+            $name = $this->nameIn($lower);
+            if ($identifier) {
+                $this->askWhat($identifier, $vehicle !== null);
+            } elseif (! $name || $this->findLoans($name, quiet: true) === 0) {
+                $this->askYogii($text);
+            }
+
+            return true;
+        }
+        $intent === 'chat' ? $this->askYogii($text) : $this->act($intent, $query ?: (string) $identifier);
+
         return true;
+    }
+
+    /** "What do you want for MEHCAR0737?" with the options that fit a loan number or a vehicle number. */
+    private function askWhat(string $identifier, bool $vehicle): void
+    {
+        $options = $vehicle
+            ? ['loan' => 'Loan file', 'rc' => 'RC details', 'challan' => 'Challan check', 'payments' => 'Payment applications']
+            : ['loan' => 'Loan file', 'loan_pdf' => 'Loan PDF', 'documents' => 'Documents', 'payments' => 'Payment applications'];
+        if ($this->canSeeCibil()) {
+            $options['cibil'] = 'CIBIL reports';
+        }
+        $this->session['step'] = 'pick';
+        $this->session['pick'] = ['id' => $identifier, 'options' => array_keys($options)];
+        $this->say("What do you want for *{$identifier}*?\n\n".collect(array_values($options))->map(fn (string $label, int $i) => '*'.($i + 1)."* {$label}")->implode("\n")."\n*0* Menu");
+    }
+
+    private function pickChoice(string $text): void
+    {
+        $pick = $this->session['pick'] ?? null;
+        $intent = ctype_digit($text) && $pick ? ($pick['options'][(int) $text - 1] ?? null) : null;
+        $intent ? $this->act($intent, $pick['id']) : $this->say('Reply with a number from the list, or *0* for the menu.');
+    }
+
+    /** Does what the user asked for, for a loan number, vehicle number or name. */
+    private function act(string $intent, string $query): void
+    {
+        $query = trim($query);
+        if ($query === '' && $intent !== 'chat') {
+            [$this->session['step'], $prompt] = match ($intent) {
+                'rc' => ['rc', 'Which vehicle number?'],
+                'challan' => ['challan', 'Which vehicle number should I check for challans?'],
+                'payments' => ['find-payment', 'Which loan number, vehicle number or name?'],
+                default => ['find-loan', 'Which loan number, vehicle number or name?'],
+            };
+            $this->say($prompt."\n\n*0* Back");
+
+            return;
+        }
+        match ($intent) {
+            'rc' => [$this->session['step'] = 'rc', $this->rcSearch($query)],
+            'challan' => [$this->session['step'] = 'challan', $this->challanCheck($query)],
+            'payments' => $this->findPayments($query),
+            default => $this->findLoans($query),
+        };
+        // PDF, documents and CIBIL go one step further when the search opened a single file.
+        if (($this->session['step'] ?? null) === 'loan' && in_array($intent, ['loan_pdf', 'documents', 'cibil'], true)) {
+            $this->loanChoice(['loan_pdf' => '1', 'documents' => '2', 'cibil' => '6'][$intent]);
+        }
+    }
+
+    private const INTENTS = ['loan', 'loan_pdf', 'documents', 'payments', 'rc', 'challan', 'cibil', 'chat'];
+
+    /**
+     * What a free sentence asks for, read by the local Yogii model: [intent, name or number], or null without the model.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function understand(string $text): ?array
+    {
+        $examples = [
+            'jaygopal ki file dikhao' => ['loan', 'jaygopal'],
+            'show loan of ravi kumar' => ['loan', 'ravi kumar'],
+            'MEHCAR0737 ki pdf bhejo' => ['loan_pdf', 'MEHCAR0737'],
+            'send documents of sunita devi' => ['documents', 'sunita devi'],
+            'ramesh ke payment ka status' => ['payments', 'ramesh'],
+            'who is the owner of RJ14AB1234' => ['rc', 'RJ14AB1234'],
+            'RJ60HS6517 pe kitne challan hai' => ['challan', 'RJ60HS6517'],
+            'cibil score of mohan lal' => ['cibil', 'mohan lal'],
+            'good morning' => ['chat', ''],
+            'how does foreclosure work?' => ['chat', ''],
+            'EMI kaise calculate hoti hai' => ['chat', ''],
+        ];
+        $messages = [['role' => 'system', 'content' => 'You read WhatsApp messages from vehicle-loan office staff (Hindi or English) and reply with JSON only: {"intent": "...", "query": "..."}. intent is one of: '.implode(', ', self::INTENTS).'. query is the customer name, loan number or vehicle number in the message, or "" if there is none. Use chat for greetings, questions and anything that is not a lookup.']];
+        foreach ($examples as $example => [$intent, $query]) {
+            $messages[] = ['role' => 'user', 'content' => $example];
+            $messages[] = ['role' => 'assistant', 'content' => json_encode(['intent' => $intent, 'query' => $query])];
+        }
+        $messages[] = ['role' => 'user', 'content' => mb_substr($text, 0, 300)];
+
+        $answer = json_decode((string) $this->yogii($messages, ['num_predict' => 60, 'temperature' => 0], 'json', 45), true);
+        $intent = is_array($answer) ? ($answer['intent'] ?? null) : null;
+        if (! in_array($intent, self::INTENTS, true)) {
+            return null;
+        }
+        $query = is_string($answer['query'] ?? null) ? mb_substr(trim($answer['query']), 0, 60) : '';
+
+        return [$intent, $query];
     }
 
     /** The name in a short search sentence, without the filler words; null for questions and longer chat. */
@@ -671,28 +780,33 @@ class MeharBot
 
     private function askYogii(string $question): void
     {
+        $reply = trim((string) $this->yogii([
+            ['role' => 'system', 'content' => 'You are Yogii, the Mehar Advisory WhatsApp assistant for vehicle loan staff and partners. Answer briefly and practically, in the language the user writes in. The bot looks up loan files, payment applications, RC details, challans and CIBIL reports when the user sends a name, loan number or vehicle number. Never invent loan, payment or customer details.'],
+            ['role' => 'user', 'content' => mb_substr($question, 0, 1000)],
+        ], ['num_predict' => 250]));
+        $this->say(($reply !== '' ? $reply : "I didn't get that. Send a name, loan number or vehicle number, or *menu*.")."\n\n_Send *menu* for the options._");
+    }
+
+    /** One call to the local Yogii model. Null without a local model or when it fails. */
+    private function yogii(array $messages, array $options, ?string $format = null, int $timeout = 120): ?string
+    {
         $model = (string) AiSettings::current()->model;
         if (! str_starts_with($model, AiSettings::LOCAL_PREFIX)) {
-            $this->menu('Pick one of the numbers.');
-
-            return;
+            return null;
         }
         try {
-            $reply = trim((string) Http::timeout(120)->connectTimeout(10)->post('http://coolify-ollama:11434/api/chat', [
+            return (string) Http::timeout($timeout)->connectTimeout(10)->post('http://coolify-ollama:11434/api/chat', array_filter([
                 'model' => substr($model, strlen(AiSettings::LOCAL_PREFIX)),
                 'stream' => false,
                 'think' => false,
                 'keep_alive' => -1,
-                'options' => ['num_predict' => 250],
-                'messages' => [
-                    ['role' => 'system', 'content' => 'You are Yogii, the Mehar Advisory WhatsApp assistant for vehicle loan staff and partners. Answer briefly and practically. You cannot look up loans, payments or RCs yourself: for those, the user picks an option from the numbered menu. Never invent loan, payment or customer details.'],
-                    ['role' => 'user', 'content' => mb_substr($question, 0, 1000)],
-                ],
-            ])->throw()->json('message.content'));
+                'format' => $format,
+                'options' => $options,
+                'messages' => $messages,
+            ], fn ($value) => $value !== null))->throw()->json('message.content');
         } catch (\Throwable) {
-            $reply = '';
+            return null;
         }
-        $this->say(($reply !== '' ? $reply : 'I did not get that.')."\n\nSend *menu* for the options.");
     }
 
     // CIBIL: view and download reports already pulled in the dashboard. Admins and managers only; no new pulls here.
