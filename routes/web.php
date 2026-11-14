@@ -31,6 +31,7 @@ use App\Livewire\Ai\Editor as AiEditor;
 use App\Livewire\Ai\Index as AiIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
+use App\Livewire\CustomUpgrade;
 use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\Canvas as DashboardCanvas;
 use App\Livewire\DeployCanvas;
@@ -316,6 +317,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', SettingsIndex::class)->name('settings.index');
         Route::get('/settings/advanced', SettingsAdvanced::class)->name('settings.advanced');
         Route::get('/settings/updates', SettingsUpdates::class)->name('settings.updates');
+        // Fork-only: progress of a running panel update, polled by the update badge and button.
+        Route::get('/settings/updates/progress', fn () => response()->json(CustomUpgrade::progress()))->name('settings.updates.progress');
 
         Route::get('/settings/backup', SettingsBackup::class)->name('settings.backup');
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');

@@ -3,9 +3,15 @@
 use App\Jobs\UpdateCoolifyJob;
 use App\Livewire\CustomUpgrade;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Server;
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -102,3 +108,37 @@ it('makes automatic updates install the newest fork build, not the upstream rele
 
     Http::assertNothingSent(); // no upstream version check against the CDN
 })->with(['update available' => true, 'already newest' => false]);
+
+it('reports update progress only to instance admins while an update runs, and clears it when done', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    $admin = User::factory()->create();
+    $rootTeam->members()->attach($admin->id, ['role' => 'admin']);
+    $this->actingAs($admin);
+    session(['currentTeam' => ['id' => 0]]);
+
+    $this->getJson(route('settings.updates.progress'))->assertOk()->assertJson(['stage' => 'idle']);
+
+    Cache::put(CustomUpgrade::RUNNING_CACHE_KEY, true, 60);
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    config(['constants.ssh.mux_enabled' => false]);
+    $key = PrivateKey::factory()->create(['team_id' => 0]);
+    Server::factory()->create(['id' => 0, 'team_id' => 0, 'private_key_id' => $key->id]);
+    Process::fake(['*' => Process::result(output: '{"stage":"downloading","percent":42,"message":"Downloading the new version"}')]);
+    $this->getJson(route('settings.updates.progress'))->assertJson(['stage' => 'downloading', 'percent' => 42]);
+
+    Process::fake(['*' => Process::result(output: '{"stage":"done","percent":100,"message":"Updated"}')]);
+    $this->getJson(route('settings.updates.progress'))->assertJson(['stage' => 'done', 'percent' => 100]);
+    expect(Cache::has(CustomUpgrade::RUNNING_CACHE_KEY))->toBeFalse();
+});
+
+it('hides update progress from users who are not instance admins', function () {
+    $team = Team::factory()->create();
+    $user = User::factory()->create();
+    $team->members()->attach($user->id, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $team->id]]);
+    Cache::put(CustomUpgrade::RUNNING_CACHE_KEY, true, 60);
+
+    $this->getJson(route('settings.updates.progress'))->assertJson(['stage' => 'idle']);
+});

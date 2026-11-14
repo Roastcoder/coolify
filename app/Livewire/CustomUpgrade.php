@@ -19,6 +19,12 @@ class CustomUpgrade extends Component
 
     public const CHECKED_AT_CACHE_KEY = 'custom-build:checked-at';
 
+    /** Set while an update runs, so every open page shows its progress. */
+    public const RUNNING_CACHE_KEY = 'custom-build:update-running';
+
+    /** Written by update-custom.sh at each stage (custom/update.sh). */
+    public const STATUS_FILE = '/data/coolify/source/.custom-update-status.json';
+
     public bool $fullButton = false;
 
     public ?string $currentSha = null;
@@ -32,6 +38,33 @@ class CustomUpgrade extends Component
     public function mount(): void
     {
         $this->currentSha = config('custom_build.sha');
+        $this->updateStarted = Cache::has(self::RUNNING_CACHE_KEY);
+    }
+
+    /**
+     * Where a running update is: {stage, percent, message}. Stage is idle, starting, downloading, restarting,
+     * done or failed. Only instance admins see it; it reads the status file only while an update runs.
+     *
+     * @return array{stage: string, percent: int, message: string}
+     */
+    public static function progress(): array
+    {
+        if (! isInstanceAdmin() || ! Cache::has(self::RUNNING_CACHE_KEY)) {
+            return ['stage' => 'idle', 'percent' => 0, 'message' => ''];
+        }
+        $server = Server::find(0);
+        $status = $server ? json_decode((string) instant_remote_process(['cat '.self::STATUS_FILE.' 2>/dev/null || true'], $server, false), true) : null;
+        $stage = is_array($status) && in_array($status['stage'] ?? null, ['starting', 'downloading', 'restarting', 'done', 'failed'], true) ? $status['stage'] : 'starting';
+        if (in_array($stage, ['done', 'failed'], true)) {
+            Cache::forget(self::RUNNING_CACHE_KEY);
+            Cache::forget(self::LATEST_BUILD_CACHE_KEY);
+        }
+
+        return [
+            'stage' => $stage,
+            'percent' => max(0, min(100, (int) ($status['percent'] ?? 2))),
+            'message' => is_string($status['message'] ?? null) ? mb_substr($status['message'], 0, 120) : 'Starting the update',
+        ];
     }
 
     #[On('check-custom-update')]
@@ -81,7 +114,9 @@ class CustomUpgrade extends Component
         }
 
         // Detached on the host: the update restarts this container, which would end a live SSH session.
-        instant_remote_process([config('custom_build.update_command')], $server);
+        // The old status file goes first, so a finished earlier update does not show as this one.
+        Cache::put(self::RUNNING_CACHE_KEY, true, now()->addMinutes(20));
+        instant_remote_process(['rm -f '.self::STATUS_FILE, config('custom_build.update_command')], $server);
 
         auditLog($auditEvent, [
             'team_id' => null,
