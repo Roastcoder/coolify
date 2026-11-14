@@ -775,13 +775,23 @@ class MeharBot
 
     // Free text: answered by the local Yogii model, which only chats and never sees the token.
 
+    /** Normal chat with Yogii about anything, with the last few messages as memory. */
     private function askYogii(string $question): void
     {
+        $history = array_slice($this->session['chat'] ?? [], -6);
+        $name = $this->session['name'] ?? '';
         $reply = trim((string) $this->yogii([
-            ['role' => 'system', 'content' => 'You are Yogii, the Mehar Advisory WhatsApp assistant for vehicle loan staff and partners. Answer briefly and practically, in the language the user writes in. The bot looks up loan files, payment applications, RC details, challans and CIBIL reports when the user sends a name, loan number or vehicle number. Never invent loan, payment or customer details.'],
+            ['role' => 'system', 'content' => 'You are Yogii, a friendly, helpful assistant on WhatsApp'.($name ? ", chatting with {$name}" : '').'. Chat naturally about anything they want: answer questions, explain, help write messages, joke around. Reply in the language and style they write in (Hindi, Hinglish or English), short and to the point like a WhatsApp message. You also work for Mehar Advisory (vehicle loans): the bot looks up loan files, payments, RC, challans and CIBIL when they send a name, loan number or vehicle number. Never make up loan, payment or customer details.'],
+            ...$history,
             ['role' => 'user', 'content' => mb_substr($question, 0, 1000)],
-        ], ['num_predict' => 250]));
-        $this->say(($reply !== '' ? $reply : "I didn't get that. Send a name, loan number or vehicle number, or *menu*.")."\n\n_Send *menu* for the options._");
+        ], ['num_predict' => 400]));
+        if ($reply === '') {
+            $this->say("I didn't catch that. Try again, or send *menu*.");
+
+            return;
+        }
+        $this->session['chat'] = array_slice([...$history, ['role' => 'user', 'content' => mb_substr($question, 0, 500)], ['role' => 'assistant', 'content' => mb_substr($reply, 0, 1000)]], -6);
+        $this->say($reply);
     }
 
     /** One call to the local Yogii model. Null without a local model or when it fails. */

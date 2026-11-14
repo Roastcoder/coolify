@@ -126,7 +126,7 @@ it('answers free text at the menu with Yogii', function () {
     meharLogin($this->bot);
     Http::fake(['coolify-ollama:11434/api/chat' => fakeYogii([], 'A hypothecation is the bank lien on the vehicle.')]);
 
-    expect(($this->bot)()->handle('what is hypothecation?')[0])->toContain('bank lien')->toContain('*menu*');
+    expect(($this->bot)()->handle('what is hypothecation?')[0])->toBe('A hypothecation is the bank lien on the vehicle.');
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'api/chat') && $r['model'] === 'yogii:latest' && ! isset($r['format']) && ! $r->hasHeader('Authorization'));
 });
 
@@ -297,4 +297,14 @@ it('searches a mobile number typed straight in', function () {
     Http::fake(['mehar.test/api/loans?search=9462394650' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737', 'mobile' => '9462394650']]])]);
 
     expect(($this->bot)()->handle('9462394650')[0])->toContain('MEHCAR0737');
+});
+
+it('chats normally with Yogii and remembers the last messages', function () {
+    AiSettings::current()->update(['model' => AiSettings::LOCAL_PREFIX.'yogii:latest']);
+    meharLogin($this->bot);
+    Http::fake(['coolify-ollama:11434/api/chat' => fakeYogii([], 'Haha, sure!')]);
+
+    expect(($this->bot)()->handle('ek joke sunao')[0])->toBe('Haha, sure!');
+    ($this->bot)()->handle('aur ek');
+    Http::assertSent(fn (Request $r) => ! isset($r['format']) && collect($r['messages'])->pluck('content')->contains('ek joke sunao') && collect($r['messages'])->last()['content'] === 'aur ek');
 });
