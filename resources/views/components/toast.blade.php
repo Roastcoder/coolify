@@ -84,7 +84,7 @@
                 }, 150);
             },
         }" @toast-show.window="addToast($event)"
-            class="fixed z-9999 flex w-[calc(100%-2rem)] gap-2.5 sm:max-w-[26rem]"
+            class="toast-stack fixed z-9999 flex w-[calc(100%-2rem)] gap-2.5 sm:max-w-[26rem]"
             :class="{
                 'right-4 top-4 flex-col': position === 'top-right',
                 'left-4 top-4 flex-col': position === 'top-left',

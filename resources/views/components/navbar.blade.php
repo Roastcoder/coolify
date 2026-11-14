@@ -2,7 +2,7 @@
 
 <nav @class([
     'sidebar-nav flex min-h-0 flex-col flex-1 border-r border-black/[0.06] dark:border-white/[0.06] pt-2',
-    'bg-[#fcfdfe] dark:bg-[#0b1222]' => $desktop,
+    'bg-[#fcfdfe] dark:bg-[#0d1310]' => $desktop,
     'bg-white dark:bg-panel' => ! $desktop,
 ])
     :class="collapsed ? 'px-2 lg:px-3 sidebar-collapsed' : 'px-2 lg:px-3'"

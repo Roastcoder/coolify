@@ -77,7 +77,7 @@
         };
         window.customThemePresets = [
             // The built-in Dark theme, not a custom theme. Its colors start the fields when the user edits it.
-            { name: 'Coolify', theme: null, swatch: { sidebar: '#0b1222', selected: '#2a3449', accent: '#22c55e', background: '#0f172a' } },
+            { name: 'Coolify', theme: null, swatch: { sidebar: '#0d1310', selected: '#222c26', accent: '#befa49', background: '#0b0f0d' } },
             { name: 'Midnight', theme: { sidebar: '#0f172a', selected: '#2e4a7d', accent: '#f2458f', background: '#1a2338' } },
             { name: 'Forest', theme: { sidebar: '#12342b', selected: '#2c6e57', accent: '#f4b860', background: '#1b2a25' } },
             { name: 'Ember', theme: { sidebar: '#3b1410', selected: '#8f2d1f', accent: '#ffb86b', background: '#241816' } },
@@ -135,7 +135,7 @@
             delete root.dataset.sidebarScheme;
             root.style.setProperty('--theme-base-color', window.hexToOklch(localStorage.themeColor));
             root.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(localStorage.themeColor));
-            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0f172a' : '#f5f7fa');
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0b0f0d' : '#f4f5f0');
         };
         // Time lines for chart tooltips. By default only the browser time zone is shown;
         // the "Chart times" option on the Appearance page adds the UTC time.
@@ -309,12 +309,15 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{-- viewport-fit=cover lets the installed app draw under the notch; the shell pads with env(safe-area-inset-*). --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#0f172a" id="theme-color-meta" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0b0f0d" id="theme-color-meta" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="Description" content="{{ config('custom_build.product_name') }}: deploy apps, databases and email on your own servers." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@coolifyio" />
     <meta name="twitter:title" content="Coolify" />
@@ -349,6 +352,12 @@
     @endenv
     <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}" />
     <link rel="manifest" href="{{ asset('site.webmanifest') }}" />
+    <script>
+        // Fork-only: offline page for the installed app (public/sw.js).
+        if ('serviceWorker' in navigator && window.isSecureContext) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+        }
+    </script>
     <meta name="apple-mobile-web-app-title" content="{{ config('custom_build.product_name') }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
@@ -357,7 +366,7 @@
         const isDark = document.documentElement.classList.contains('dark');
         document.getElementById('theme-color-meta')?.setAttribute('content', document.documentElement.dataset.theme === 'custom'
             ? window.storedCustomTheme().background
-            : (isDark ? '#0f172a' : '#f5f7fa'));
+            : (isDark ? '#0b0f0d' : '#f4f5f0'));
     </script>
     <style>
         [x-cloak] {

@@ -1,14 +1,58 @@
 {
+    "id": "/",
     "name": "StandaloneCoders Cloud",
     "short_name": "SC Cloud",
+    "description": "Deploy apps, databases and email on your own servers.",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
+    "display_override": [
+        "standalone",
+        "minimal-ui"
+    ],
+    "orientation": "any",
     "background_color": "#101613",
     "theme_color": "#101613",
     "icons": [
-        { "src": "/icon-192.png?v=2", "type": "image/png", "sizes": "192x192" },
-        { "src": "/icon-512.png?v=2", "type": "image/png", "sizes": "512x512" },
-        { "src": "/icon-maskable-512.png?v=2", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+        {
+            "src": "/icon-192.png?v=2",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "/icon-512.png?v=2",
+            "type": "image/png",
+            "sizes": "512x512"
+        },
+        {
+            "src": "/icon-maskable-512.png?v=2",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Projects",
+            "url": "/projects",
+            "icons": [
+                {
+                    "src": "/icon-192.png?v=2",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
+        },
+        {
+            "name": "Servers",
+            "url": "/servers",
+            "icons": [
+                {
+                    "src": "/icon-192.png?v=2",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
+        }
     ]
 }

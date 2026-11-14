@@ -43,9 +43,9 @@
                 x-init="new ResizeObserver(([entry]) => $el.style.setProperty('--resource-actions-w', entry.borderBoxSize[0].inlineSize + 'px')).observe($refs.resourceActions)"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
-                class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-md border-b border-black/[0.06] dark:border-white/[0.06] shadow-xs">
+                class="app-topbar hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/90 dark:bg-[#0b0f0d]/90 backdrop-blur-md border-b border-black/[0.06] dark:border-white/[0.06] shadow-xs">
                 {{-- Brand (width tracks sidebar) --}}
-                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-[#fcfdfe] dark:border-white/[0.06] dark:bg-[#0b1222] transition-[width] duration-200"
+                <div class="app-topbar-brand flex items-center gap-2 h-full shrink-0 border-r border-black/[0.06] bg-[#fcfdfe] dark:border-white/[0.06] dark:bg-[#0d1310] transition-[width] duration-200"
                     :class="collapsed ? 'w-(--sidebar-collapsed-w) justify-center px-0 border-b' : 'w-56 px-4'">
                     <div class="flex items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="StandaloneCoders"
@@ -143,7 +143,7 @@
 
             {{-- ============ MOBILE TOP BAR ============ --}}
             <div
-                class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 gap-x-4 sm:px-6 lg:hidden bg-white/95 dark:bg-panel/95 backdrop-blur-sm border-b border-neutral-200/60 dark:border-white/[0.06]">
+                class="mobile-topbar sticky top-0 z-40 flex items-center justify-between px-4 py-2.5 gap-x-3 sm:px-6 lg:hidden bg-white/90 dark:bg-panel/90 backdrop-blur-md border-b border-neutral-200/60 dark:border-white/[0.06]">
                 <div class="flex min-w-0 flex-1 items-center gap-2.5">
                     <a href="/"
                         class="flex size-8 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-80">
@@ -163,21 +163,13 @@
                         <livewire:custom-upgrade key="mobile-upgrade" />
                     @endif
                     <x-top-user-menu />
-                    <button type="button" x-on:click="open = !open"
-                        class="-mr-1 flex size-9 items-center justify-center rounded-md text-neutral-500 transition-transform duration-100 ease-out hover:bg-neutral-100 hover:text-black active:scale-90 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                        <span class="sr-only">Open sidebar</span>
-                        <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" stroke-width="1.6" />
-                            <path d="M16 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-                        </svg>
-                    </button>
                 </div>
             </div>
 
             {{-- ============ MAIN ============ --}}
             @if ($fullBleed ?? false)
                 {{-- Full-bleed pages (canvases) fill the space between the top bar and the sidebar. --}}
-                <main class="app-main app-main-full relative min-h-0 flex-1 bg-neutral-50 dark:bg-app lg:pt-12"
+                <main class="app-main app-main-full relative min-h-0 flex-1 bg-neutral-50 dark:bg-app pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pt-12"
                     :class="[collapsed ? 'lg:ml-(--sidebar-collapsed-w)' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
                     <div class="relative h-full">
                         {{ $slot }}
@@ -185,13 +177,14 @@
                 </main>
             @else
                 <main
-                    class="app-main min-h-screen bg-neutral-50 dark:bg-app px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
+                    class="app-main min-h-screen bg-neutral-50 dark:bg-app px-4 pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
                     :class="[collapsed ? 'lg:ml-(--sidebar-collapsed-w)' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '', pageWidth === 'centered' ? '' : 'app-main-wide']">
                     <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
                         {{ $slot }}
                     </div>
                 </main>
             @endif
+            <x-mobile-tab-bar />
         </div>
     @endauth
 @endsection

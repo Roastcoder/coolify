@@ -18,7 +18,7 @@
 
         $iconButton = 'card-icon-button flex size-7 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.08] dark:hover:text-fg';
         $titleIconButton = 'flex size-6 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
-        $tableShell = 'overflow-x-auto rounded-2xl border border-neutral-200/80 bg-white/90 shadow-sm backdrop-blur-md dark:border-white/[0.08] dark:bg-[#131c2e]/60';
+        $tableShell = 'overflow-x-auto rounded-2xl border border-neutral-200/80 bg-white/90 shadow-sm backdrop-blur-md dark:border-white/[0.08] dark:bg-[#121915]/60';
         $tableHead = 'border-b border-neutral-200/80 bg-neutral-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-fg-faint';
         $tableRow = 'min-h-14 items-center border-b border-neutral-200/60 px-4 py-3 text-[12.5px] transition-colors last:border-b-0 hover:bg-neutral-50/80 dark:border-white/[0.05] dark:hover:bg-white/[0.03]';
     @endphp
@@ -99,7 +99,7 @@
         </div>
 
         {{-- ==================== EXECUTIVE METRIC STAT CARDS ==================== --}}
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {{-- Stat 1: Projects --}}
             @php
                 $allProjectsRoute = $projects->count() > $dashboardItemLimit ? route('project.index') : null;
@@ -262,7 +262,7 @@
                                 @endphp
 
                                 <article
-                                    class="group relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-neutral-200/85 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-emerald-500/40 hover:shadow-lg dark:border-white/[0.08] dark:bg-[#131c2e]/70 dark:hover:border-emerald-500/30 dark:hover:shadow-black/40">
+                                    class="group relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-neutral-200/85 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-lime-500/40 hover:shadow-lg dark:border-white/[0.08] dark:bg-[#121915]/70 dark:hover:border-lime-400/30 dark:hover:shadow-black/40">
                                     <a href="{{ $project->navigateTo() }}" {{ wireNavigate() }}
                                         class="absolute inset-0 rounded-2xl"
                                         aria-label="Open {{ $project->name }}"></a>
@@ -280,7 +280,7 @@
                                         </div>
                                         <div class="min-w-0 flex-1 self-center">
                                             <h3
-                                                class="truncate text-[13.5px] leading-5 font-semibold text-neutral-900 group-hover:text-emerald-600 dark:text-white dark:group-hover:text-emerald-400 transition-colors">
+                                                class="truncate text-[13.5px] leading-5 font-semibold text-neutral-900 group-hover:text-lime-700 dark:text-white dark:group-hover:text-lime-300 transition-colors">
                                                 {{ $project->name }}
                                             </h3>
                                             @if (filled($project->description))
@@ -474,7 +474,7 @@
 
                                 <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
                                     {{ wireNavigate() }} aria-label="Open {{ $server->name }}"
-                                    class="group relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-neutral-200/85 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-emerald-500/40 hover:shadow-lg dark:border-white/[0.08] dark:bg-[#131c2e]/70 dark:hover:border-emerald-500/30 dark:hover:shadow-black/40">
+                                    class="group relative flex min-h-32 min-w-0 flex-col rounded-2xl border border-neutral-200/85 bg-white/95 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-lime-500/40 hover:shadow-lg dark:border-white/[0.08] dark:bg-[#121915]/70 dark:hover:border-lime-400/30 dark:hover:shadow-black/40">
                                     @if ($server->isMetricsEnabled())
                                         <livewire:dashboard.server-metrics-chart :server="$server"
                                             :key="'dashboard-server-metrics-'.$server->uuid" />
@@ -487,7 +487,7 @@
                                         </div>
                                         <div class="min-w-0 flex-1 self-center">
                                             <h3
-                                                class="truncate text-[13.5px] leading-5 font-semibold text-neutral-900 group-hover:text-emerald-600 dark:text-white dark:group-hover:text-emerald-400 transition-colors">
+                                                class="truncate text-[13.5px] leading-5 font-semibold text-neutral-900 group-hover:text-lime-700 dark:text-white dark:group-hover:text-lime-300 transition-colors">
                                                 {{ $server->name }}
                                             </h3>
                                             @if (filled($server->description))
