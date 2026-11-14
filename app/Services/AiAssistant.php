@@ -157,8 +157,18 @@ class AiAssistant
         if (in_array($command, ['help', 'menu', 'hi', 'hello', 'hey'], true)) {
             return "Instant commands:\n*status* - summary of everything\n*apps* - every app and its status\n*down* - what is not running\n\nAsk anything else in your own words and the AI answers (slower).";
         }
-        if (! $user || ! in_array($command, ['status', 'servers', 'apps', 'down', 'health'], true)) {
+        // "app list", "list", "application list" and typos like "appliction" all mean apps.
+        if (preg_match('/^(list|ap+l?\w*( list)?|list( of)? ap+l?\w*)$/', $command)) {
+            $command = 'apps';
+        }
+        if (! $user) {
             return null;
+        }
+        if (! in_array($command, ['status', 'servers', 'apps', 'down', 'health'], true)) {
+            $wanted = preg_replace('/[^a-z0-9]/', '', $command);
+
+            // Only a one-word message can be a resource name; anything else goes to the AI.
+            return str_contains($command, ' ') || strlen($wanted) < 4 ? null : $this->statusOf($this->listResources($user), $wanted);
         }
         $servers = $this->listResources($user);
         if ($command === 'status' || $command === 'servers' || $command === 'health') {
@@ -167,6 +177,15 @@ class AiAssistant
         $lines = $this->resourceLines($servers, onlyDown: $command === 'down');
 
         return $lines === '' ? ($command === 'down' ? 'Everything is running.' : 'No apps found.') : $lines;
+    }
+
+    /** A one-word message that names a resource gets its real status at once, so the AI never has to guess it. */
+    private function statusOf(array $servers, string $wanted): ?string
+    {
+        $matches = collect(explode("\n", $this->resourceLines($servers)))
+            ->filter(fn (string $line) => str_contains(preg_replace('/[^a-z0-9]/', '', strtolower(Str::between($line, ' ', ': '))), $wanted));
+
+        return $matches->isEmpty() ? null : $matches->implode("\n");
     }
 
     /** Actions from WhatsApp need the access password; the web app is behind a login already. */

@@ -225,8 +225,22 @@ it('answers the common commands instantly without the AI', function () {
 
     expect($assistant->handle($conversation, 'help'))->toContain('*status*')
         ->and($assistant->handle($conversation, 'Status'))->toStartWith('Summary: 0 server(s)')
-        ->and($assistant->handle($conversation, 'down'))->toBe('Everything is running.');
+        ->and($assistant->handle($conversation, 'down'))->toBe('Everything is running.')
+        ->and($assistant->handle($conversation, 'Appliction list'))->toBe('No apps found.')
+        ->and($assistant->handle($conversation, 'list'))->toBe('No apps found.');
     Http::assertNothingSent();
+});
+
+it('answers a resource name with its real status, without the AI', function () {
+    $servers = [['name' => 'main', 'uuid' => 's1', 'applications' => [
+        ['name' => 'standalone-coders', 'uuid' => 'a1', 'status' => 'running:healthy'],
+        ['name' => 'mehar-dvr-backend', 'uuid' => 'a2', 'status' => 'exited'],
+    ], 'databases' => [], 'services' => []]];
+    $statusOf = fn (string $wanted) => (fn () => $this->statusOf($servers, $wanted))->call(new AiAssistant);
+
+    expect($statusOf('standalonecoder'))->toBe('app standalone-coders: running:healthy')
+        ->and($statusOf('mehardvr'))->toBe('app mehar-dvr-backend: exited')
+        ->and($statusOf('running'))->toBeNull();
 });
 
 it('opens a picked app in VS Code and falls back to all files', function () {
