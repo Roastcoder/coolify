@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 /**
- * Fork-only: the Mehar Advisory WhatsApp bot. A dashboard user logs in (OTP to their number, or ID and password)
+ * Fork-only: Mehar Advisory inside Yogii, the WhatsApp assistant. A dashboard user logs in (OTP to their number, or ID and password)
  * and then works through numbered menus: find a loan file or payment application, RC search, challan check,
  * PDFs and documents. Every call goes to the Mehar backend with the user's own token, so the backend's
  * permissions apply exactly as in the dashboard. The session lives 12 hours in the cache, token encrypted.
@@ -65,7 +65,7 @@ class MeharBot
 
         try {
             if (in_array($command, ['logout', 'log out', 'exit'], true)) {
-                $this->forget('Logged out. Send *login* to log in again.');
+                $this->forget('Logged out of Mehar Advisory. Send *login* to log in again.');
             } elseif (! isset($this->session['token'])) {
                 $this->login($text);
             } elseif (in_array($command, ['menu', 'hi', 'hello', 'start', 'login', 'mehar'], true) || ($command === '0' && in_array($this->step(), ['menu', 'find-loan', 'find-payment', 'rc', 'challan', 'loans', 'payments'], true))) {
@@ -115,7 +115,7 @@ class MeharBot
 
         if ($step === null || in_array(strtolower($text), ['login', 'mehar'], true)) {
             $this->session = ['step' => 'login-choice'];
-            $this->say("*Mehar Advisory login*\n1. 📱 OTP to this WhatsApp number\n2. 🔑 ID and password\n\nReply with a number.");
+            $this->say("*Yogii · Mehar Advisory login*\n1. 📱 OTP to this WhatsApp number\n2. 🔑 ID and password\n\nReply with a number.");
 
             return;
         }
@@ -196,7 +196,7 @@ class MeharBot
     private function menu(string $lead = ''): void
     {
         $this->session['step'] = 'menu';
-        $this->say(trim($lead."\n\n*Mehar Advisory menu*\n1. 🔎 Find a loan file\n2. 💸 Find a payment application\n3. 🚗 RC search\n4. 🚦 Challan check\n9. 🚪 Log out\n\nReply with a number. *menu* brings you back here."));
+        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n1. 🔎 Find a loan file\n2. 💸 Find a payment application\n3. 🚗 RC search\n4. 🚦 Challan check\n9. 🚪 Log out\n\nReply with a number. *menu* brings you back here."));
     }
 
     private function menuChoice(string $text): void
@@ -208,7 +208,7 @@ class MeharBot
             '4' => ['challan', 'Send the vehicle number to check challans.'],
         ];
         if ($text === '9') {
-            $this->forget('Logged out. Send *login* to log in again.');
+            $this->forget('Logged out of Mehar Advisory. Send *login* to log in again.');
 
             return;
         }

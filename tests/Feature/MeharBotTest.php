@@ -2,8 +2,11 @@
 
 use App\Jobs\MeharBotJob;
 use App\Jobs\SendWhatsappMessageJob;
+use App\Models\AiConversation;
 use App\Models\AiSettings;
 use App\Models\InstanceSettings;
+use App\Models\User;
+use App\Services\AiAssistant;
 use App\Services\MeharBot;
 use App\Services\WhatsappGateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -112,4 +115,14 @@ it('answers free text at the menu with Yogii', function () {
 
     expect(($this->bot)()->handle('what is hypothecation?')[0])->toContain('bank lien')->toContain('*menu*');
     Http::assertSent(fn (Request $r) => str_contains($r->url(), 'api/chat') && $r['model'] === 'yogii:latest' && ! $r->hasHeader('Authorization'));
+});
+
+it('opens Mehar Advisory from the Yogii menu', function () {
+    $owner = User::factory()->create();
+    $conversation = AiConversation::create(['user_id' => $owner->id, 'channel' => 'whatsapp', 'channel_id' => '919000000003', 'messages' => [], 'read_only' => false]);
+    $assistant = app(AiAssistant::class);
+
+    expect($assistant->handle($conversation, 'menu'))->toContain('4. 🏦 Mehar Advisory');
+    expect($assistant->handle($conversation, '4'))->toContain('Yogii · Mehar Advisory login')
+        ->and(Cache::get('mehar-bot:919000000003')['step'])->toBe('login-choice');
 });

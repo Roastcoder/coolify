@@ -175,7 +175,8 @@ class AiAssistant
 
             return $reply;
         };
-        $mainMenu = fn (): string => $show(['level' => 'main'], "*Menu*\n1. 📊 Status of everything\n2. 📁 Projects and apps\n3. 🔴 What is down\n\nReply with a number. Send *menu* any time, *0* to go back. Or type a question in your own words for the AI.");
+        $mehar = $conversation->channel === 'whatsapp' && MeharBot::enabled();
+        $mainMenu = fn (): string => $show(['level' => 'main'], "*Menu*\n1. 📊 Status of everything\n2. 📁 Projects and apps\n3. 🔴 What is down".($mehar ? "\n4. 🏦 Mehar Advisory" : '')."\n\nReply with a number. Send *menu* any time, *0* to go back. Or type a question in your own words for the AI.");
 
         if (in_array($command, ['help', 'menu', 'hi', 'hello', 'hey', 'start'], true) || ($command === '0' && in_array($menu['level'] ?? 'main', ['main', 'projects'], true))) {
             return $mainMenu();
@@ -186,6 +187,10 @@ class AiAssistant
         }
         if (! $user) {
             return null;
+        }
+        // Mehar Advisory runs inside Yogii: from here on the webhook sends this chat to it until logout.
+        if ($mehar && ($command === 'mehar' || ($command === '4' && ($menu['level'] ?? null) === 'main'))) {
+            return implode("\n\n", array_filter((new MeharBot($conversation->channel_id))->handle('login'), 'is_string'));
         }
         if ($command === 'status' || $command === 'servers' || $command === 'health' || ($command === '1' && ($menu['level'] ?? null) === 'main')) {
             return $this->summary($this->listResources($user));
