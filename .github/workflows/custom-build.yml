@@ -1,12 +1,12 @@
 name: StandaloneCoders Cloud - Build Image
 
 # Builds the app into ghcr.io/roastcoder/standalonecoders-cloud:latest.
-# A pushed version tag (v1.0.0) also publishes the image as :v1.0.0.
+# A pushed release tag (sc-v1.0.0) also publishes the image as :sc-v1.0.0.
 
 on:
   push:
     branches: ["main"]
-    tags: ["v*"]
+    tags: ["sc-v*"]  # not v*: upstream already uses v1.0.0 to v4.x
     paths-ignore:
       - "*.md"
       - templates/**
