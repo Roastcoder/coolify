@@ -222,6 +222,18 @@ it('lets an approver approve a payment with remarks, and hides that from others'
     expect(($this->bot)()->handle('3')[0])->toContain('Pick a number');
 });
 
+it('shows each role its own menu', function () {
+    meharLogin($this->bot);
+    expect(($this->bot)()->handle('menu')[0])->toContain('👤 Asha · Manager')->toContain('*1* 📁 Loan files · CIBIL')->toContain('*2* 💳 Payment applications');
+
+    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'accountant'], 60);
+    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 💳 Payment applications · approve')->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('1')[0])->toContain('Payment applications');
+
+    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'sales'], 60);
+    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 📁 Loan files')->not->toContain('approve')->not->toContain('CIBIL');
+});
+
 it('understands chat as well as the menu', function () {
     meharLogin($this->bot);
     Http::fake([

@@ -359,32 +359,60 @@ class MeharBot
 
     // Menu
 
+    private const MENU_ITEMS = [
+        'loan' => ['📁', 'Loan files', 'find-loan', 'Send a loan number, file number, RC number, or the applicant or customer name.'],
+        'payment' => ['💳', 'Payment applications', 'find-payment', 'Send a loan number, RC number, or the applicant, customer or beneficiary name.'],
+        'rc' => ['🚗', 'RC search', 'rc', 'Send the vehicle number, for example RJ14AB1234.'],
+        'challan' => ['🚦', 'Challan check', 'challan', 'Send the vehicle number to check challans.'],
+    ];
+
+    /** Menu entries in the order this role uses them most: accounts start with payments. */
+    private function menuItems(): array
+    {
+        return in_array(strtolower($this->session['role'] ?? ''), ['accountant', 'accounts'], true)
+            ? ['payment', 'loan', 'rc', 'challan']
+            : ['loan', 'payment', 'rc', 'challan'];
+    }
+
     private function menu(string $lead = ''): void
     {
         $this->session['step'] = 'menu';
-        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n\n*1* Find a loan file\n*2* Find a payment application\n*3* RC search\n*4* Challan check\n*9* Log out\n\nReply with a number, or just type what you need: *MEHCAR0737*, *jaygopal ki file*, *RJ60HS6517 challan*, *rc RJ60HS6517*, *MEHCAR0737 pdf*. *menu* brings you back here."));
+        $role = strtolower($this->session['role'] ?? '');
+        $name = $this->session['name'] ?? '';
+        $items = collect($this->menuItems())->map(function (string $key, int $i) {
+            [$icon, $label] = self::MENU_ITEMS[$key];
+            $extra = match (true) {
+                $key === 'payment' && $this->isApprover() => ' · approve',
+                $key === 'loan' && $this->canSeeCibil() => ' · CIBIL',
+                default => '',
+            };
+
+            return '*'.($i + 1)."* {$icon} {$label}{$extra}";
+        })->implode("\n");
+        $tips = match (true) {
+            $this->isApprover() && ! $this->canSeeCibil() => ['*MEHCAR0737 payment*', '*jaygopal ka payment*', '*MEHCAR0737 pdf*'],
+            $this->canSeeCibil() => ['*MEHCAR0737*', '*jaygopal ki file*', '*MEHCAR0737 cibil*', '*RJ60HS6517 challan*'],
+            default => ['*MEHCAR0737*', '*jaygopal ki file*', '*rc RJ60HS6517*', '*MEHCAR0737 pdf*'],
+        };
+        $this->say(trim($lead."\n\n🏦 *Mehar Advisory*\n".($name !== '' ? "👤 {$name}".($role !== '' ? ' · '.Str::headline($role) : '')."\n" : '')
+            ."━━━━━━━━━━━━━━\n{$items}\n━━━━━━━━━━━━━━\n*9* 🚪 Log out\n\n💬 Or just type: ".implode(', ', $tips)."\n_Send *menu* any time._"));
     }
 
     private function menuChoice(string $text): void
     {
-        $prompts = [
-            '1' => ['find-loan', 'Send a loan number, file number, RC number, or the applicant or customer name.'],
-            '2' => ['find-payment', 'Send a loan number, RC number, or the applicant, customer or beneficiary name.'],
-            '3' => ['rc', 'Send the vehicle number, for example RJ14AB1234.'],
-            '4' => ['challan', 'Send the vehicle number to check challans.'],
-        ];
         if ($text === '9') {
-            $this->forget('Logged out of Mehar Advisory. Send *login* to log in again.');
+            $this->forget('👋 Logged out of Mehar Advisory. Send *login* to log in again.');
 
             return;
         }
-        if (! isset($prompts[$text])) {
+        $key = ctype_digit($text) ? ($this->menuItems()[(int) $text - 1] ?? null) : null;
+        if (! $key) {
             ctype_digit($text) ? $this->menu('Pick one of the numbers.') : $this->askYogii($text);
 
             return;
         }
-        [$this->session['step'], $prompt] = $prompts[$text];
-        $this->say($prompt."\n\n*0* Back");
+        [$icon, $label, $this->session['step'], $prompt] = self::MENU_ITEMS[$key];
+        $this->say("{$icon} *{$label}*\n{$prompt}\n\n*0* Back");
     }
 
     // Loan files
