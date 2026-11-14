@@ -235,6 +235,14 @@ class MeharBot
 
             return;
         }
+        // A typed loan, file or vehicle number that matches one file exactly opens it straight away.
+        $key = fn ($value) => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $value));
+        $exact = $loans->filter(fn (array $loan) => in_array($key($search), array_map($key, [$loan['loan_number'] ?? '', $loan['file_number'] ?? '', $loan['vehicle_number'] ?? '']), true));
+        if ($exact->count() === 1) {
+            $this->showLoan((string) $exact->first()['id']);
+
+            return;
+        }
         $this->session['step'] = 'loans';
         $this->session['list'] = $loans->pluck('id')->map(fn ($id) => (string) $id)->all();
         $this->say("*Loan files*\n".$loans->map(fn (array $loan, int $i) => ($i + 1).'. '.$this->loanLine($loan))->implode("\n")."\n\nReply with a number to open one. *0* Back");

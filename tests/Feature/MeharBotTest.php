@@ -56,13 +56,13 @@ it('offers ID and password when the number is unknown, and stops after three wro
 it('searches loan files, opens one and sends its PDF', function () {
     meharLogin($this->bot);
     Http::fake([
-        'mehar.test/api/loans?search=RJ14AB1234' => Http::response(['data' => [['id' => 7, 'loan_number' => 'ML-7', 'applicant_name' => 'Ravi', 'vehicle_number' => 'RJ14AB1234', 'status' => 'disbursed']]]),
+        'mehar.test/api/loans?search=Ravi' => Http::response(['data' => [['id' => 7, 'loan_number' => 'ML-7', 'applicant_name' => 'Ravi', 'vehicle_number' => 'RJ14AB1234', 'status' => 'disbursed']]]),
         'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'ML-7', 'applicant_name' => 'Ravi', 'loan_amount' => 500000]]),
         'mehar.test/api/pdf/loan/7' => Http::response('%PDF-1.4', 200, ['Content-Type' => 'application/pdf']),
     ]);
 
     ($this->bot)()->handle('1');
-    expect(($this->bot)()->handle('RJ14AB1234')[0])->toContain('1. ML-7 · Ravi · RJ14AB1234 · Disbursed');
+    expect(($this->bot)()->handle('Ravi')[0])->toContain('1. ML-7 · Ravi · RJ14AB1234 · Disbursed');
     expect(($this->bot)()->handle('1')[0])->toContain('Loan amount: ₹5,00,000')->toContain('Download loan PDF');
     $file = ($this->bot)()->handle('1')[0];
     expect($file['file'])->toBe('%PDF-1.4')->and($file['filename'])->toBe('Loan-ML-7.pdf');
@@ -125,4 +125,15 @@ it('opens Mehar Advisory from the Yogii menu', function () {
     expect($assistant->handle($conversation, 'menu'))->toContain('4. 🏦 Mehar Advisory');
     expect($assistant->handle($conversation, '4'))->toContain('Yogii · Mehar Advisory login')
         ->and(Cache::get('mehar-bot:919000000003')['step'])->toBe('login-choice');
+});
+
+it('opens a loan file straight away when the loan number matches exactly', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/loans?search=*' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737'], ['id' => 9, 'loan_number' => 'MEHCAR0393']]]),
+        'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'MEHCAR0737', 'applicant_name' => 'Jaygopal']]),
+    ]);
+    ($this->bot)()->handle('1');
+
+    expect(($this->bot)()->handle('mehcar 0737')[0])->toContain('Loan file')->toContain('Applicant: Jaygopal');
 });
