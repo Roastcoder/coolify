@@ -12,7 +12,7 @@ use Livewire\Component;
 
 /**
  * Fork-only: the AI page. A chat with the assistant and a code editor for files on a server,
- * with Claude to change them. Reading and writing files is root access, so it needs the page unlocked.
+ * with Claude to change them. Instance admins only; the web app needs no access password.
  */
 class Index extends Component
 {
@@ -25,8 +25,6 @@ class Index extends Component
     /** What the page waits for from AiWebTaskJob: 'chat', 'rewrite' or null. */
     #[Locked]
     public ?string $waiting = null;
-
-    public string $unlockPassword = '';
 
     public string $serverUuid = '';
 
@@ -69,13 +67,6 @@ class Index extends Component
     public function answer(bool $allow): void
     {
         $this->message = $allow ? 'YES' : 'NO';
-        $this->send();
-    }
-
-    public function unlock(): void
-    {
-        $this->message = 'unlock '.$this->unlockPassword;
-        $this->unlockPassword = '';
         $this->send();
     }
 
@@ -145,11 +136,6 @@ class Index extends Component
 
     private function rootAction(callable $action): void
     {
-        if (! $this->conversation()->isUnlocked()) {
-            $this->dispatch('error', 'Root access is locked. Enter the access password to unlock it.');
-
-            return;
-        }
         try {
             $action(app(AiAssistant::class));
         } catch (\Throwable $e) {
@@ -192,7 +178,6 @@ class Index extends Component
         return view('livewire.ai.index', [
             'configured' => app(AiAssistant::class)->isConfigured(),
             'pending' => $conversation->pending_action ? app(AiAssistant::class)->describe($conversation->pending_action['calls']) : null,
-            'unlocked' => $conversation->isUnlocked(),
             'servers' => $this->servers()->map(fn (Server $server) => ['value' => $server->uuid, 'label' => $server->name.' ('.$server->ip.')'])->all(),
         ]);
     }

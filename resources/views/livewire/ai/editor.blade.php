@@ -19,9 +19,7 @@
             busy: false, message: '',
 
             init() {
-                if (config.unlocked) {
-                    this.loadMonaco();
-                }
+                this.loadMonaco();
             },
 
             say(text) { this.message = text; },
@@ -252,7 +250,7 @@
     };
 </script>
 
-<div class="sc-ide flex h-full min-h-0 flex-col" x-data="scIde(@js(['unlocked' => $unlocked, 'configured' => $configured]))" x-on:keydown.window="onKey($event)">
+<div class="sc-ide flex h-full min-h-0 flex-col" x-data="scIde(@js(['configured' => $configured]))" x-on:keydown.window="onKey($event)">
 
     {{-- Toolbar --}}
     <div class="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-white/[0.07]">
@@ -279,17 +277,6 @@
         </div>
     </div>
 
-    @unless ($unlocked)
-        <div class="flex flex-1 items-center justify-center p-6">
-            <form wire:submit="unlock" class="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-6 dark:border-white/[0.07] dark:bg-panel">
-                <h1 class="text-lg font-semibold">Unlock root access</h1>
-                <p class="text-sm">The code editor reads and writes files as root. Enter the access password from Settings &gt; AI assistant. It stays unlocked for 15 minutes.</p>
-                <label for="sc-ide-password" class="sr-only">Access password</label>
-                <input id="sc-ide-password" type="password" wire:model="unlockPassword" class="input" placeholder="Access password" autocomplete="current-password" autofocus>
-                <x-forms.button type="submit" isHighlighted>Unlock</x-forms.button>
-            </form>
-        </div>
-    @else
         <div class="relative flex min-h-0 flex-1">
             {{-- Explorer --}}
             <aside x-show="sidebar" x-cloak class="sc-ide-explorer absolute inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-neutral-200 bg-white lg:static lg:z-auto lg:flex dark:border-white/[0.07] dark:bg-panel"
@@ -383,6 +370,5 @@
             <span class="shrink-0" x-show="active" x-text="language"></span>
             <span class="shrink-0" x-text="message"></span>
         </footer>
-    @endunless
 </div>
 </div>

@@ -17,8 +17,8 @@ use Illuminate\Support\Str;
 /**
  * Fork-only: Claude as an operator for this instance, used by the AI page and the WhatsApp agent.
  *
- * Instance admins: reading (list, logs) runs at once; deploy, restart and stop wait for a YES; root access
- * (commands, server files) also needs the conversation unlocked with the access password. The password is
+ * Instance admins: reading (list, logs) runs at once; every change or command waits for a YES. On WhatsApp it
+ * also needs the chat unlocked with the access password (the web app already has a login). The password is
  * checked here and never sent to Claude. Everyone else (employees) only gets the dashboard data of their teams.
  */
 class AiAssistant
@@ -31,9 +31,6 @@ class AiAssistant
 
     /** Tools that wait for a YES. */
     public const GUARDED_TOOLS = ['deploy_application', 'restart_application', 'stop_application', 'run_server_command', 'read_file', 'write_file'];
-
-    /** Root access: these also need the access password. */
-    public const ROOT_TOOLS = ['run_server_command', 'read_file', 'write_file'];
 
     /** All that a user who is not an instance admin can use. */
     public const READ_ONLY_TOOLS = ['list_resources'];
@@ -79,7 +76,7 @@ class AiAssistant
 
         if ($pending) {
             $approved = (bool) preg_match('/^(yes|y|confirm|allow|ok|run it)[.!]?$/i', $text);
-            if ($approved && $this->needsPassword($pending['calls']) && ! $conversation->isUnlocked()) {
+            if ($approved && $this->needsPassword($conversation) && ! $conversation->isUnlocked()) {
                 return 'Locked. First send: unlock <your access password>. Then reply YES.';
             }
             $results = $pending['results'];
@@ -125,10 +122,10 @@ class AiAssistant
         return $json['content'];
     }
 
-    /** @param  array<int, array{name: string}>  $calls */
-    private function needsPassword(array $calls): bool
+    /** Actions from WhatsApp need the access password; the web app is behind a login already. */
+    private function needsPassword(AiConversation $conversation): bool
     {
-        return collect($calls)->contains(fn (array $call) => in_array($call['name'], self::ROOT_TOOLS, true));
+        return $conversation->channel === 'whatsapp';
     }
 
     private function unlock(AiConversation $conversation, string $password): string
@@ -206,7 +203,7 @@ class AiAssistant
                 $lead = $this->text($response);
 
                 return trim($lead."\n\n".'Claude wants to:'."\n".$this->describe($guarded)."\n\n"
-                    .($this->needsPassword($guarded) && ! $conversation->isUnlocked() ? 'This needs root access. To allow, send: unlock <your access password>, then reply YES.' : 'Reply YES to allow, or NO.'));
+                    .($this->needsPassword($conversation) && ! $conversation->isUnlocked() ? 'To allow, send: unlock <your access password>, then reply YES.' : 'Reply YES to allow, or NO.'));
             }
 
             $messages[] = ['role' => 'user', 'content' => $results];
@@ -277,7 +274,7 @@ class AiAssistant
         return <<<PROMPT
         You are the operator assistant of StandaloneCoders Cloud, a hosting platform. You help the owner manage servers, applications, databases and services. You talk with them on {$channel}.
 
-        Use list_resources first to find uuids. Reading logs is always allowed. Deploying, restarting, stopping, running commands on a server and reading or writing server files are held until the user allows them; call the tool and the app asks the user (root access also needs their access password, which they send to the app, not to you). Never ask the user for passwords or API keys. Call the product StandaloneCoders Cloud, never Coolify. If the user did not allow an action, do not try a different way to do the same thing.
+        Use list_resources first to find uuids. Reading logs is always allowed. Deploying, restarting, stopping, running commands on a server and reading or writing server files are held until the user allows them; call the tool and the app asks the user (on WhatsApp the user also sends their access password to the app, never to you). Never ask the user for passwords or API keys. Call the product StandaloneCoders Cloud, never Coolify. If the user did not allow an action, do not try a different way to do the same thing.
         Commands run as root over SSH: prefer read-only commands to look around, and say clearly what a command will change before you run it.
         PROMPT;
     }

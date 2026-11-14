@@ -44,19 +44,19 @@ function claudeText(string $text): array
     return ['stop_reason' => 'end_turn', 'content' => [['type' => 'text', 'text' => $text]]];
 }
 
-function conversationFor(User $user, bool $readOnly = false): AiConversation
+function conversationFor(User $user, bool $readOnly = false, string $channel = 'whatsapp'): AiConversation
 {
-    return AiConversation::query()->create(['user_id' => $user->id, 'channel' => 'whatsapp', 'channel_id' => (string) $user->phone, 'messages' => [], 'read_only' => $readOnly]);
+    return AiConversation::query()->create(['user_id' => $user->id, 'channel' => $channel, 'channel_id' => $channel === 'web' ? (string) $user->id : (string) $user->phone, 'messages' => [], 'read_only' => $readOnly]);
 }
 
-it('holds root actions until the access password and a YES, and never sends the password to Claude', function () {
+it('holds WhatsApp actions until the access password and a YES, and never sends the password to Claude', function () {
     Http::fakeSequence('api.anthropic.com/*')
         ->push(claudeToolCall('run_server_command', ['server_uuid' => 'nope', 'command' => 'df -h']))
         ->push(claudeText('Disk is fine.'));
     $conversation = conversationFor($this->admin);
     $assistant = new AiAssistant;
 
-    expect($assistant->handle($conversation, 'how full is the disk?'))->toContain('run_server_command')->toContain('needs root access')
+    expect($assistant->handle($conversation, 'how full is the disk?'))->toContain('run_server_command')->toContain('unlock <your access password>')
         ->and($assistant->handle($conversation->refresh(), 'YES'))->toContain('Locked')
         ->and($assistant->handle($conversation->refresh(), 'unlock wrong-password'))->toBe('Wrong password.')
         ->and($assistant->handle($conversation->refresh(), 'unlock open-sesame-42'))->toContain('Unlocked')
@@ -68,15 +68,19 @@ it('holds root actions until the access password and a YES, and never sends the 
     Http::assertSent(fn (Request $request) => str_contains($request->body(), '"tool_use_id":"toolu_1"'));
 });
 
-it('asks only for a YES before a deploy', function () {
+it('asks the web app only for a YES, but WhatsApp also for the password', function () {
     Http::fakeSequence('api.anthropic.com/*')
         ->push(claudeToolCall('deploy_application', ['uuid' => 'missing']))
-        ->push(claudeText('Could not find it.'));
-    $conversation = conversationFor($this->admin);
+        ->push(claudeText('Could not find it.'))
+        ->push(claudeToolCall('deploy_application', ['uuid' => 'missing']));
+    $web = conversationFor($this->admin, channel: 'web');
+    $whatsapp = conversationFor($this->admin);
     $assistant = new AiAssistant;
 
-    expect($assistant->handle($conversation, 'deploy my app'))->toContain('Reply YES')
-        ->and($assistant->handle($conversation->refresh(), 'yes'))->toBe('Could not find it.');
+    expect($assistant->handle($web, 'deploy my app'))->toContain('Reply YES')
+        ->and($assistant->handle($web->refresh(), 'yes'))->toBe('Could not find it.')
+        ->and($assistant->handle($whatsapp, 'deploy my app'))->toContain('unlock <your access password>')
+        ->and($assistant->handle($whatsapp->refresh(), 'yes'))->toContain('Locked');
 });
 
 it('tells Claude when the user does not allow an action', function () {
@@ -159,13 +163,10 @@ it('opens the settings page on a fresh install', function () {
     Livewire::test(AiSettingsPage::class)->assertOk()->assertSet('model', 'claude-opus-5-5');
 });
 
-it('keeps the code editor locked until the access password is given', function () {
+it('opens the code editor for instance admins only and checks paths', function () {
     $this->actingAs($this->admin)->withSession(['currentTeam' => $this->rootTeam]);
 
-    $editor = Livewire::test(Editor::class)->assertSee('Unlock root access');
-    expect($editor->instance()->listDir('/etc'))->toBe(['error' => 'Root access is locked. Enter the access password.']);
-
-    $editor->set('unlockPassword', 'open-sesame-42')->call('unlock')->assertDontSee('Unlock root access');
+    $editor = Livewire::test(Editor::class)->assertDontSee('Unlock root access');
     expect($editor->instance()->listDir('/etc/../root'))->toBe(['error' => 'Invalid path.'])
         ->and($editor->instance()->readFile('/etc/hosts'))->toBe(['error' => 'Open a workspace first.'])
         ->and($editor->instance()->openWorkspace('server:not-mine'))->toHaveKey('error');

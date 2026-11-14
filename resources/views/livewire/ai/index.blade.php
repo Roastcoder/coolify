@@ -9,15 +9,6 @@
             <p class="text-sm">Ask Claude to check, deploy and fix your servers and apps, or to change files on a server.</p>
         </div>
         <div class="flex items-center gap-2">
-            <span @class(['rounded-full px-3 py-1 text-xs font-medium', 'bg-success/15 text-success' => $unlocked, 'bg-neutral-200 dark:bg-white/10' => ! $unlocked])>
-                Root access {{ $unlocked ? 'unlocked' : 'locked' }}
-            </span>
-            @unless ($unlocked)
-                <form wire:submit="unlock" class="flex items-center gap-2">
-                    <input type="password" wire:model="unlockPassword" placeholder="Access password" autocomplete="current-password" aria-label="Access password" class="input w-44">
-                    <x-forms.button type="submit">Unlock</x-forms.button>
-                </form>
-            @endunless
             <a href="{{ route('settings.ai') }}" class="button" {{ wireNavigate() }}>Settings</a>
         </div>
     </div>
@@ -85,7 +76,7 @@
             <div class="grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
                 <x-forms.listbox id="serverUuid" label="Server" :options="$servers" />
                 <x-forms.input id="path" label="File" placeholder="/etc/nginx/nginx.conf" />
-                <x-forms.button wire:click="loadFile" :disabled="! $unlocked">Open</x-forms.button>
+                <x-forms.button wire:click="loadFile">Open</x-forms.button>
             </div>
             <x-forms.textarea id="content" useMonacoEditor monacoEditorLanguage="plaintext" rows="20" />
             <form wire:submit="askClaude" class="flex flex-col gap-2 sm:flex-row">
@@ -94,10 +85,10 @@
                 <x-forms.button type="submit" :disabled="! $configured || $waiting">{{ $waiting === 'rewrite' ? 'Claude is editing…' : 'Ask Claude' }}</x-forms.button>
             </form>
             <div class="flex items-center justify-between gap-3">
-                <p class="text-xs">{{ $unlocked ? ($loadedPath ? 'Opened '.$loadedPath : 'Open a file or write a new one.') : 'Unlock root access to open and save files.' }}</p>
+                <p class="text-xs">{{ $loadedPath ? 'Opened '.$loadedPath : 'Open a file or write a new one.' }} <a href="{{ route('ai.editor') }}" class="underline" {{ wireNavigate() }}>Open the full editor</a></p>
                 <x-modal-confirmation title="Save this file on the server?" submitAction="saveFile" buttonTitle="Save"
                     :actions="['The file on the server is replaced with what is in the editor.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Save">
-                    <x-slot:trigger><button type="button" class="button" @disabled(! $unlocked)>Save to server</button></x-slot:trigger>
+                    <x-slot:trigger><button type="button" class="button">Save to server</button></x-slot:trigger>
                 </x-modal-confirmation>
             </div>
         </section>

@@ -23,7 +23,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * Fork-only: the code editor, a VS Code-like workspace. Open a project's application, database or
  * service (its running container) or a server's own folders, browse the tree, edit in tabs, and ask
  * Claude to change a file (shown as a diff to accept). The page renders once; the editor in the
- * browser calls the methods below, which return data. Root access, so the page must be unlocked.
+ * browser calls the methods below, which return data. Root access, so instance admins only.
  */
 class Editor extends Component
 {
@@ -33,8 +33,6 @@ class Editor extends Component
 
     #[Locked]
     public string $root = '/';
-
-    public string $unlockPassword = '';
 
     public function mount()
     {
@@ -49,19 +47,11 @@ class Editor extends Component
         abort_unless(isInstanceAdmin(), 403);
     }
 
-    public function unlock(): void
-    {
-        $reply = app(AiAssistant::class)->handle($this->conversation(), 'unlock '.$this->unlockPassword);
-        $this->unlockPassword = '';
-        $this->dispatch($this->conversation()->isUnlocked() ? 'success' : 'error', $reply);
-    }
-
     /** @return array{root: string, label: string} */
     #[Renderless]
     public function openWorkspace(string $key, string $root = ''): array
     {
         return $this->attempt(function () use ($key, $root) {
-            $this->ensureUnlocked();
             $this->workspace = $key;
             $this->root = '/';
             $service = $this->files();
@@ -80,7 +70,6 @@ class Editor extends Component
     public function listDir(string $path): array
     {
         return $this->attempt(function () use ($path) {
-            $this->ensureUnlocked();
             $path = $this->path($path);
 
             return collect($this->files()->list($path))
@@ -99,7 +88,6 @@ class Editor extends Component
     public function readFile(string $path): array
     {
         return $this->attempt(function () use ($path) {
-            $this->ensureUnlocked();
 
             return $this->files()->read($this->path($path));
         });
@@ -109,7 +97,6 @@ class Editor extends Component
     public function writeFile(string $path, string $content): array
     {
         return $this->attempt(function () use ($path, $content) {
-            $this->ensureUnlocked();
             abort_if(strlen($content) > 5 * 1024 * 1024, 413, 'File too large.');
             $this->files()->write($this->path($path), $content);
 
@@ -121,7 +108,6 @@ class Editor extends Component
     public function createEntry(string $path, bool $folder): array
     {
         return $this->attempt(function () use ($path, $folder) {
-            $this->ensureUnlocked();
             $folder ? $this->files()->makeDirectory($this->path($path)) : $this->files()->createFile($this->path($path));
 
             return true;
@@ -132,7 +118,6 @@ class Editor extends Component
     public function renameEntry(string $from, string $to): array
     {
         return $this->attempt(function () use ($from, $to) {
-            $this->ensureUnlocked();
             $this->files()->rename($this->path($from), $this->path($to));
 
             return true;
@@ -143,7 +128,6 @@ class Editor extends Component
     public function deleteEntry(string $path): array
     {
         return $this->attempt(function () use ($path) {
-            $this->ensureUnlocked();
             $path = $this->path($path);
             abort_if($path === '/' || $path === $this->root, 422, 'This folder cannot be deleted here.');
             $this->files()->delete($path);
@@ -156,7 +140,6 @@ class Editor extends Component
     public function askClaude(string $path, string $content, string $instruction): array
     {
         return $this->attempt(function () use ($path, $content, $instruction) {
-            $this->ensureUnlocked();
             abort_unless(app(AiAssistant::class)->isConfigured(), 422, 'Add a Claude API key in Settings > AI assistant.');
             $instruction = trim(mb_substr($instruction, 0, 4000));
             abort_if($instruction === '', 422, 'Tell Claude what to change.');
@@ -191,11 +174,6 @@ class Editor extends Component
 
             return ['error' => Str::limit($e->getMessage(), 300)];
         }
-    }
-
-    private function ensureUnlocked(): void
-    {
-        abort_unless($this->conversation()->isUnlocked(), 423, 'Root access is locked. Enter the access password.');
     }
 
     private function path(string $path): string
@@ -281,7 +259,6 @@ class Editor extends Component
     {
         return view('livewire.ai.editor', [
             'workspaces' => $this->workspaces(),
-            'unlocked' => $this->conversation()->isUnlocked(),
             'configured' => app(AiAssistant::class)->isConfigured(),
         ])->layout('layouts.app', ['fullBleed' => true]);
     }

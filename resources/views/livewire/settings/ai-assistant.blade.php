@@ -7,7 +7,7 @@
         <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
             <form wire:submit="save">
                 <x-application.settings-section title="AI assistant"
-                    description="Claude manages this instance from the AI page and from WhatsApp. Reading is instant; deploy, restart and stop ask for YES; root access (commands, server files) also needs the access password.">
+                    description="Claude manages this instance from the AI page and from WhatsApp. Reading is instant; every change or command asks for YES first. On WhatsApp it also needs the access password.">
                     <x-slot:actions>
                         <x-forms.button type="submit">Save</x-forms.button>
                         <a href="{{ route('ai.index') }}" class="button" {{ wireNavigate() }}>Open AI</a>
@@ -20,9 +20,9 @@
                         <x-forms.listbox id="model" label="Model" :options="$models" />
                         <x-forms.input id="accessPassword" type="password" label="Access password" autocomplete="new-password"
                             :placeholder="$hasAccessPassword ? 'Set. Enter a new one to change it.' : 'At least 8 characters'"
-                            helper="Unlocks root access for 15 minutes: send 'unlock your-password' in the chat. Use a password you use nowhere else." />
+                            helper="For WhatsApp: send 'unlock your-password' in the chat to allow changes for 15 minutes. Use a password you use nowhere else." />
                         <x-forms.input id="rootNumbers" label="Root WhatsApp numbers" placeholder="919876543210"
-                            helper="These numbers manage everything, like the owner. Root actions still need the access password. Separate several with commas." />
+                            helper="These numbers manage everything, like the owner. Changes still need the access password. Separate several with commas." />
                     </div>
                     @unless ($hasApiKey)
                         <p class="text-sm text-warning">Add a Claude API key to turn the assistant on.</p>
