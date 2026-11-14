@@ -57,7 +57,8 @@ class GuestAssistantJob implements ShouldBeEncrypted, ShouldQueue
             $reply .= "\n\nMehar Advisory partner? Reply *login* to use the dashboard here.";
         }
 
-        Cache::put($key, array_slice([...$chat, ['role' => 'user', 'content' => $text], ['role' => 'assistant', 'content' => mb_substr((string) $reply, 0, 1000)]], -8), now()->addHours(12));
+        // Only the last two exchanges: the small local model copies long histories instead of answering.
+        Cache::put($key, array_slice([...$chat, ['role' => 'user', 'content' => $text], ['role' => 'assistant', 'content' => mb_substr((string) $reply, 0, 1000)]], -4), now()->addHours(12));
         if ($reply !== null) {
             SendWhatsappMessageJob::dispatch($this->number, $reply);
         }
