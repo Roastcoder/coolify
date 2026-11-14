@@ -31,7 +31,7 @@
                 // The panel is restarting on the new version: keep the bar moving until it answers again.
                 this.seen = true;
                 this.label = 'Restarting the panel';
-                this.percent = Math.min(97, Math.max(this.percent, 75) + 2);
+                this.percent = Math.min(97, Math.max(this.percent, 75) + 1); // the restart takes about a minute
             }
         }
     }"
