@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Ai;
 
+use App\Models\Application;
 use App\Services\VscodeServer;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -13,6 +14,13 @@ class Editor extends Component
 {
     #[Locked]
     public bool $running = false;
+
+    /** The folder VS Code shows. Set only by openProject(). */
+    #[Locked]
+    public string $folder = VscodeServer::ALL_FILES;
+
+    /** The app picked in the project list, or '' for all files. */
+    public string $project = '';
 
     public function mount()
     {
@@ -48,6 +56,30 @@ class Editor extends Component
         }
     }
 
+    public function openProject(): void
+    {
+        try {
+            if ($this->project === '') {
+                $this->folder = VscodeServer::ALL_FILES;
+
+                return;
+            }
+            $application = $this->applications()->firstWhere('uuid', $this->project);
+            if (! $application) {
+                throw new \RuntimeException('App not found.');
+            }
+            $this->folder = app(VscodeServer::class)->openProject($application);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** Apps built from a git repository. Only instance admins reach this page, and they manage every app. */
+    private function applications()
+    {
+        return Application::query()->whereNotNull('git_repository')->where('build_pack', '!=', 'dockerimage')->orderBy('name')->get();
+    }
+
     public function stop(): void
     {
         try {
@@ -60,6 +92,9 @@ class Editor extends Component
 
     public function render()
     {
-        return view('livewire.ai.editor', ['url' => VscodeServer::PATH.'/'])->layout('layouts.app', ['fullBleed' => true]);
+        return view('livewire.ai.editor', [
+            'url' => VscodeServer::PATH.'/?folder='.rawurlencode($this->folder),
+            'projects' => [['value' => '', 'label' => 'All files'], ...$this->applications()->map(fn (Application $application) => ['value' => $application->uuid, 'label' => $application->name])->all()],
+        ])->layout('layouts.app', ['fullBleed' => true]);
     }
 }

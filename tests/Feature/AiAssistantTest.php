@@ -1,11 +1,15 @@
 <?php
 
 use App\Jobs\AiWhatsappReplyJob;
+use App\Livewire\Ai\Editor as CodePage;
 use App\Livewire\Ai\Index as AiPage;
 use App\Livewire\Settings\AiAssistant as AiSettingsPage;
 use App\Models\AiConversation;
 use App\Models\AiSettings;
+use App\Models\Application;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -206,4 +210,21 @@ it('answers the common commands instantly without the AI', function () {
         ->and($assistant->handle($conversation, 'Status'))->toStartWith('Summary: 0 server(s)')
         ->and($assistant->handle($conversation, 'down'))->toBe('Everything is running.');
     Http::assertNothingSent();
+});
+
+it('opens a picked app in VS Code and falls back to all files', function () {
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->rootTeam->id])->id]);
+    $application = Application::factory()->create(['environment_id' => $environment->id, 'name' => 'Shop API']);
+    $vscode = Mockery::mock(VscodeServer::class)->makePartial();
+    $vscode->shouldReceive('isRunning')->andReturnTrue();
+    $vscode->shouldReceive('openProject')->once()->withArgs(fn (Application $app) => $app->is($application))->andReturn('/root/projects/shop-api-abc123');
+    app()->instance(VscodeServer::class, $vscode);
+
+    Livewire::actingAs($this->admin)->test(CodePage::class)
+        ->assertSee('Shop API')
+        ->set('project', $application->uuid)->call('openProject')
+        ->assertSet('folder', '/root/projects/shop-api-abc123')
+        ->assertSee('/vscode/?folder='.rawurlencode('/root/projects/shop-api-abc123'), false)
+        ->set('project', '')->call('openProject')
+        ->assertSet('folder', VscodeServer::ALL_FILES);
 });

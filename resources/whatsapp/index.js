@@ -70,13 +70,18 @@ client.on('message_create', async (message) => {
             number = me;
         } else {
             number = (await message.getContact()).number;
+            // WhatsApp now hides many senders behind a private id (…@lid); ask WhatsApp for the phone number behind it.
+            if (message.from.endsWith('@lid')) {
+                const [match] = await client.getContactLidAndPhone([message.from]).catch(() => []);
+                number = String(match?.pn || '').split('@')[0] || number;
+            }
         }
         const response = await fetch(WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Whatsapp-Secret': SECRET },
             body: JSON.stringify({ id: message.id._serialized, number: number || '', body: message.body }),
         });
-        console.log('Forwarded a message from', number || 'unknown', '->', response.status);
+        console.log('Forwarded a message from', number ? '…' + String(number).slice(-4) : 'unknown', message.fromMe ? '(own chat)' : '', '->', response.status);
     } catch (error) {
         console.error('Could not forward a message:', error.message);
     }

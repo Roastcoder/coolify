@@ -6,6 +6,12 @@
     <div class="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-white/[0.07]">
         <h1 class="mr-auto text-base font-semibold">VS Code</h1>
         @if ($running)
+            <form wire:submit="openProject" class="flex items-end gap-2">
+                <div class="w-64"><x-forms.listbox id="project" label="Project" :options="$projects" /></div>
+                <x-forms.button type="submit" wire:loading.attr="disabled" wire:target="openProject">
+                    <span wire:loading.remove wire:target="openProject">Open</span><span wire:loading wire:target="openProject">Opening…</span>
+                </x-forms.button>
+            </form>
             <a href="{{ $url }}" target="_blank" rel="noopener" class="button">Open in new tab</a>
             <x-forms.button wire:click="start">Restart</x-forms.button>
             <x-modal-confirmation title="Stop VS Code?" isErrorButton submitAction="stop" buttonTitle="Stop"
@@ -16,7 +22,7 @@
     </div>
 
     @if ($running)
-        <iframe src="{{ $url }}" title="VS Code" class="min-h-0 w-full flex-1 border-0 bg-[#1e1e1e]" allow="clipboard-read; clipboard-write"></iframe>
+        <iframe wire:key="vscode-{{ md5($folder) }}" src="{{ $url }}" title="VS Code" class="min-h-0 w-full flex-1 border-0 bg-[#1e1e1e]" allow="clipboard-read; clipboard-write"></iframe>
     @else
         <div class="flex flex-1 items-center justify-center p-6">
             <div class="flex max-w-md flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-6 dark:border-white/[0.07] dark:bg-panel">
