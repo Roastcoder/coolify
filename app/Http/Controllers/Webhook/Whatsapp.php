@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\AiWhatsappReplyJob;
+use App\Jobs\GuestAssistantJob;
 use App\Jobs\MeharBotJob;
-use App\Jobs\SendWhatsappMessageJob;
 use App\Models\AiSettings;
 use App\Models\User;
 use App\Services\MeharBot;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Cache;
  * Fork-only: incoming chats from the built-in WhatsApp gateway.
  * Root numbers (Settings > AI assistant) act as the instance owner; root actions still need the access password.
  * Other senders whose profile phone number matches a user get read-only dashboard data.
- * Everyone else talks to the owner's personal assistant, which asks what they want and passes it on to the owner.
+ * Everyone else chats with the owner's personal assistant (GuestAssistantJob), which passes their messages on to the owner.
  */
 class Whatsapp extends Controller
 {
@@ -49,34 +49,10 @@ class Whatsapp extends Controller
         if ($user) {
             AiWhatsappReplyJob::dispatch($user->id, $number, mb_substr($body, 0, 8000), readOnly: ! $root);
         } else {
-            self::personalAssistant($number, $body);
+            GuestAssistantJob::dispatch($number, mb_substr($body, 0, 3000));
         }
 
         return response()->json(['ok' => true]);
-    }
-
-    /**
-     * Instant replies, no AI: asks a new sender what they want, passes their answer and later messages to the owner.
-     * The conversation starts again after 12 quiet hours.
-     */
-    private static function personalAssistant(string $number, string $body): void
-    {
-        $owner = AiSettings::numbers(AiSettings::current()->whatsapp_root_numbers)[0] ?? null;
-        $key = 'whatsapp-guest:'.$number;
-        $step = Cache::get($key);
-        Cache::put($key, $step === null ? 'asked' : 'relayed', now()->addHours(12));
-
-        if ($step === null) {
-            SendWhatsappMessageJob::dispatch($number, "Hi! I'm Yogii, the personal assistant for this number. They can't reply right now.\n\nMay I know your name and what you're messaging about? I'll pass it on.".(MeharBot::enabled() ? "\n\nMehar Advisory partner? Reply *login* to use the dashboard here." : ''));
-
-            return;
-        }
-        if ($owner) {
-            SendWhatsappMessageJob::dispatch($owner, "Message for you from +{$number} (wa.me/{$number}):\n\n".mb_substr($body, 0, 3000));
-        }
-        if ($step === 'asked') {
-            SendWhatsappMessageJob::dispatch($number, "Thanks! I've passed this on. You'll get a reply as soon as possible.");
-        }
     }
 
     /** The instance admin with this phone number, else the root user. */

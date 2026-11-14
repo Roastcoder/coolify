@@ -795,7 +795,7 @@ class MeharBot
     }
 
     /** One call to the local Yogii model. Null without a local model or when it fails. */
-    private function yogii(array $messages, array $options, ?string $format = null, int $timeout = 120): ?string
+    public static function yogii(array $messages, array $options, ?string $format = null, int $timeout = 120): ?string
     {
         $model = (string) AiSettings::current()->model;
         if (! str_starts_with($model, AiSettings::LOCAL_PREFIX)) {

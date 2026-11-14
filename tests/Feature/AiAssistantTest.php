@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\AiWhatsappReplyJob;
+use App\Jobs\GuestAssistantJob;
 use App\Jobs\SendWhatsappMessageJob;
 use App\Livewire\Ai\Editor as CodePage;
 use App\Livewire\Ai\Index as AiPage;
@@ -289,21 +290,38 @@ it('opens a picked app in VS Code and falls back to all files', function () {
         ->assertSet('folder', VscodeServer::ALL_FILES);
 });
 
-it('answers unknown senders as the personal assistant and passes their messages to the owner', function () {
+it('lets Yogii chat with unknown senders and passes their messages to the owner', function () {
     Queue::fake();
     $secret = ['X-Whatsapp-Secret' => str_repeat('s', 48)];
-    $send = fn (string $id, string $body) => $this->postJson('/webhooks/whatsapp', ['id' => $id, 'number' => '15550001111', 'body' => $body], $secret)->assertOk();
-    $sent = fn () => Queue::pushed(SendWhatsappMessageJob::class)->map(fn ($job) => [$job->number, $job->message])->values()->all();
-
-    $send('g1', 'hello');
-    expect($sent())->toHaveCount(1)->and($sent()[0][0])->toBe('15550001111')->and($sent()[0][1])->toContain('May I know your name');
-
-    $send('g2', 'Ravi here, about the car loan');
-    expect($sent())->toHaveCount(3)
-        ->and($sent()[1])->toBe(['919876543210', "Message for you from +15550001111 (wa.me/15550001111):\n\nRavi here, about the car loan"])
-        ->and($sent()[2][1])->toContain('passed this on');
-
-    $send('g3', 'please call me');
-    expect($sent())->toHaveCount(4)->and($sent()[3][0])->toBe('919876543210');
+    $this->postJson('/webhooks/whatsapp', ['id' => 'g1', 'number' => '15550001111', 'body' => 'Kesa h'], $secret)->assertOk();
+    Queue::assertPushed(GuestAssistantJob::class, fn ($job) => $job->number === '15550001111' && $job->text === 'Kesa h');
     Queue::assertNotPushed(AiWhatsappReplyJob::class);
+
+    AiSettings::current()->update(['model' => AiSettings::LOCAL_PREFIX.'yogii']);
+    Http::fake(['coolify-ollama:11434/*' => Http::response(['message' => ['content' => 'Main theek hoon! Aap kaun bol rahe hain?']])]);
+    (new GuestAssistantJob('15550001111', 'Kesa h'))->handle();
+    (new GuestAssistantJob('15550001111', 'Ravi, car loan ke baare mein'))->handle();
+
+    $sent = Queue::pushed(SendWhatsappMessageJob::class)->map(fn ($job) => [$job->number, $job->message])->values()->all();
+    expect($sent)->toHaveCount(4)
+        ->and($sent[0])->toBe(['919876543210', "Message for you from +15550001111 (wa.me/15550001111):\n\nKesa h"])
+        ->and($sent[1])->toBe(['15550001111', 'Main theek hoon! Aap kaun bol rahe hain?'])
+        ->and($sent[2][0])->toBe('919876543210');
+    // The second call carries the first exchange, so Yogii keeps the thread.
+    Http::assertSent(fn ($request) => count($request['messages']) === 4 && $request['messages'][1]['content'] === 'Kesa h');
+});
+
+it('falls back to fixed replies for unknown senders without the local model', function () {
+    Queue::fake();
+    Http::fake();
+    foreach (['hello', 'Ravi here, about the car loan', 'please call me'] as $text) {
+        (new GuestAssistantJob('15550001111', $text))->handle();
+    }
+
+    $toGuest = Queue::pushed(SendWhatsappMessageJob::class)->filter(fn ($job) => $job->number === '15550001111')->map->message->values();
+    expect($toGuest)->toHaveCount(2)
+        ->and($toGuest[0])->toContain('May I know your name')
+        ->and($toGuest[1])->toContain('passed this on')
+        ->and(Queue::pushed(SendWhatsappMessageJob::class)->where('number', '919876543210'))->toHaveCount(3);
+    Http::assertNothingSent();
 });

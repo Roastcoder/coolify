@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\GuestAssistantJob;
 use App\Jobs\MeharBotJob;
 use App\Jobs\SendWhatsappMessageJob;
 use App\Models\AiConversation;
@@ -112,6 +113,9 @@ it('routes login and active sessions to the bot, and everyone else as before', f
     $secret = ['X-Whatsapp-Secret' => str_repeat('s', 48)];
 
     $this->postJson('/webhooks/whatsapp', ['id' => 'a1', 'number' => '919000000001', 'body' => 'hello'], $secret)->assertOk();
+    Queue::assertPushed(GuestAssistantJob::class, 1);
+    Http::fake();
+    (new GuestAssistantJob('919000000001', 'hello'))->handle();
     Queue::assertPushed(SendWhatsappMessageJob::class, fn ($job) => str_contains($job->message, 'Reply *login*'));
     $this->postJson('/webhooks/whatsapp', ['id' => 'a2', 'number' => '919000000001', 'body' => 'Login'], $secret)->assertOk();
     Queue::assertPushed(MeharBotJob::class, 1);
