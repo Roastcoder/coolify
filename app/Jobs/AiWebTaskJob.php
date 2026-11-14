@@ -43,9 +43,7 @@ class AiWebTaskJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
-            $result = $this->kind === 'rewrite'
-                ? ['kind' => 'rewrite', 'content' => $assistant->rewriteFile($this->payload['path'], $this->payload['content'], $this->payload['instruction'])]
-                : ['kind' => 'chat', 'text' => $assistant->handle($conversation, $this->payload['text'])];
+            $result = ['kind' => 'chat', 'text' => $assistant->handle($conversation, $this->payload['text'])];
         } catch (\Throwable $e) {
             report($e);
             $result = ['kind' => $this->kind, 'error' => $e->getMessage()];

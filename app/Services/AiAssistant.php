@@ -101,36 +101,6 @@ class AiAssistant
         return $this->run($conversation, $messages);
     }
 
-    /** Asks Claude to change a file. Returns the whole new file, for the user to review before saving. */
-    public function rewriteFile(string $path, string $content, string $instruction): string
-    {
-        $response = $this->call([
-            'system' => 'You edit files on Linux servers managed by StandaloneCoders Cloud. Apply the requested change and return the complete new file. Change nothing else.',
-            'messages' => [['role' => 'user', 'content' => "File: {$path}\n\n<file>\n{$content}\n</file>\n\nChange: {$instruction}"]],
-            ...($this->settings->isLocal() ? [] : ['output_config' => ['format' => ['type' => 'json_schema', 'schema' => [
-                'type' => 'object',
-                'properties' => ['content' => ['type' => 'string']],
-                'required' => ['content'],
-                'additionalProperties' => false,
-            ]]]]),
-        ]);
-        if (($response['stop_reason'] ?? null) === 'refusal') {
-            throw new \RuntimeException('The AI declined this change.');
-        }
-
-        // Small local models do not support structured output: take the reply as the file, without a code fence.
-        if ($this->settings->isLocal()) {
-            return preg_replace('/^```[^\n]*\n(.*)\n```$/s', '$1', $this->text($response))."\n";
-        }
-
-        $json = json_decode($this->text($response), true);
-        if (! is_string($json['content'] ?? null)) {
-            throw new \RuntimeException('The AI did not return a file.');
-        }
-
-        return $json['content'];
-    }
-
     /** Instant answers without the AI for the common questions. Null when the AI should answer. */
     private function quickReply(?User $user, string $text): ?string
     {

@@ -6,7 +6,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1>AI</h1>
-            <p class="text-sm">Ask the AI to check, deploy and fix your servers and apps, or to change files on a server.</p>
+            <p class="text-sm">Ask the AI to check, deploy and fix your servers and apps. Instant: status, apps, down, help.</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ route('settings.ai') }}" class="button" {{ wireNavigate() }}>Settings</a>
@@ -19,14 +19,13 @@
         </div>
     @endunless
 
-    <div class="grid min-w-0 gap-6 xl:grid-cols-2">
-        {{-- Chat --}}
-        <section class="flex min-h-[32rem] min-w-0 flex-col rounded-xl border border-neutral-200 bg-white dark:border-white/[0.07] dark:bg-panel" aria-label="Chat">
+    <div class="min-w-0">
+        <section class="flex h-[calc(100dvh-14rem)] min-h-[28rem] min-w-0 flex-col rounded-xl border border-neutral-200 bg-white dark:border-white/[0.07] dark:bg-panel" aria-label="Chat">
             <header class="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-white/[0.07]">
                 <h2 class="text-base font-semibold">Chat</h2>
                 <button type="button" wire:click="newChat" class="button" @disabled($waiting)>New chat</button>
             </header>
-            <div class="flex max-h-[60vh] flex-1 flex-col gap-3 overflow-y-auto p-4" x-data x-init="$el.scrollTop = $el.scrollHeight"
+            <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4" x-data x-init="$el.scrollTop = $el.scrollHeight"
                 x-effect="$wire.log; $nextTick(() => $el.scrollTop = $el.scrollHeight)" aria-live="polite">
                 @forelse ($log as $entry)
                     <div wire:key="ai-log-{{ $loop->index }}-{{ md5($entry['text']) }}" @class([
@@ -70,27 +69,5 @@
             </form>
         </section>
 
-        {{-- Code editor --}}
-        <section class="flex min-w-0 flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4 dark:border-white/[0.07] dark:bg-panel" aria-label="Code editor">
-            <h2 class="text-base font-semibold">Code editor</h2>
-            <div class="grid gap-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end">
-                <x-forms.listbox id="serverUuid" label="Server" :options="$servers" />
-                <x-forms.input id="path" label="File" placeholder="/etc/nginx/nginx.conf" />
-                <x-forms.button wire:click="loadFile">Open</x-forms.button>
-            </div>
-            <x-forms.textarea id="content" useMonacoEditor monacoEditorLanguage="plaintext" rows="20" />
-            <form wire:submit="askClaude" class="flex flex-col gap-2 sm:flex-row">
-                <label for="ai-instruction" class="sr-only">Change to make</label>
-                <input id="ai-instruction" wire:model="instruction" placeholder="Tell the AI what to change in this file" class="input flex-1" @disabled(! $configured)>
-                <x-forms.button type="submit" :disabled="! $configured || $waiting">{{ $waiting === 'rewrite' ? 'The AI is editing…' : 'Ask AI' }}</x-forms.button>
-            </form>
-            <div class="flex items-center justify-between gap-3">
-                <p class="text-xs">{{ $loadedPath ? 'Opened '.$loadedPath : 'Open a file or write a new one.' }} <a href="{{ route('ai.editor') }}" class="underline" {{ wireNavigate() }}>Open the full editor</a></p>
-                <x-modal-confirmation title="Save this file on the server?" submitAction="saveFile" buttonTitle="Save"
-                    :actions="['The file on the server is replaced with what is in the editor.']" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Save">
-                    <x-slot:trigger><button type="button" class="button">Save to server</button></x-slot:trigger>
-                </x-modal-confirmation>
-            </div>
-        </section>
     </div>
 </div>
