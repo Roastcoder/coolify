@@ -67,7 +67,7 @@ class Whatsapp extends Controller
         Cache::put($key, $step === null ? 'asked' : 'relayed', now()->addHours(12));
 
         if ($step === null) {
-            SendWhatsappMessageJob::dispatch($number, "Hi! I'm the personal assistant for this number. They can't reply right now.\n\nMay I know your name and what you're messaging about? I'll pass it on.".(MeharBot::enabled() ? "\n\nMehar Advisory partner? Reply *login* to use the dashboard here." : ''));
+            SendWhatsappMessageJob::dispatch($number, "Hi! I'm Yogii, the personal assistant for this number. They can't reply right now.\n\nMay I know your name and what you're messaging about? I'll pass it on.".(MeharBot::enabled() ? "\n\nMehar Advisory partner? Reply *login* to use the dashboard here." : ''));
 
             return;
         }
