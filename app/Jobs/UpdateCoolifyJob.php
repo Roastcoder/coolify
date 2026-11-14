@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Server\UpdateCoolify;
+use App\Livewire\CustomUpgrade;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -26,6 +27,15 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
     public function handle(): void
     {
         try {
+            // Fork: builds of this fork update to the newest fork build, never with the upstream installer.
+            if (filled(config('custom_build.repository'))) {
+                $upgrade = app(CustomUpgrade::class);
+                $upgrade->mount();
+                Log::info($upgrade->installLatest('instance.custom_auto_update_started') ? 'Automatic update to the newest build started.' : 'Already on the newest build. Skipping update.');
+
+                return;
+            }
+
             CheckForUpdatesJob::dispatchSync();
             $settings = instanceSettings();
             if (! $settings->new_version_available) {

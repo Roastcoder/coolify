@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\UpdateCoolifyJob;
 use App\Livewire\CustomUpgrade;
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,3 +91,14 @@ it('reads the build commit of the latest image when GitHub cannot be reached (pr
     'running the latest image' => ['42684fa8dda58f5e4c6bc290ba373a1d06bc8e1b', false],
     'running an older build' => ['892075d0f00000000000000000000000000000000', true],
 ]);
+
+it('makes automatic updates install the newest fork build, not the upstream release', function (bool $available) {
+    $upgrade = Mockery::mock(CustomUpgrade::class)->makePartial();
+    $upgrade->shouldReceive('installLatest')->once()->with('instance.custom_auto_update_started')->andReturn($available);
+    app()->instance(CustomUpgrade::class, $upgrade);
+    Http::fake();
+
+    (new UpdateCoolifyJob)->handle();
+
+    Http::assertNothingSent(); // no upstream version check against the CDN
+})->with(['update available' => true, 'already newest' => false]);

@@ -17,6 +17,8 @@ class CustomUpgrade extends Component
 {
     public const LATEST_BUILD_CACHE_KEY = 'custom-build:latest-sha';
 
+    public const CHECKED_AT_CACHE_KEY = 'custom-build:checked-at';
+
     public bool $fullButton = false;
 
     public ?string $currentSha = null;
@@ -45,7 +47,11 @@ class CustomUpgrade extends Component
             Cache::forget(self::LATEST_BUILD_CACHE_KEY);
         }
 
-        $this->latestSha = Cache::remember(self::LATEST_BUILD_CACHE_KEY, 300, fn (): ?string => $this->fetchLatestBuildSha());
+        $this->latestSha = Cache::remember(self::LATEST_BUILD_CACHE_KEY, 300, function (): ?string {
+            Cache::put(self::CHECKED_AT_CACHE_KEY, now()->toIso8601String(), now()->addWeek());
+
+            return $this->fetchLatestBuildSha();
+        });
         $this->isUpdateAvailable = filled($this->currentSha)
             && filled($this->latestSha)
             && ! str_starts_with($this->currentSha, $this->latestSha)
@@ -57,27 +63,34 @@ class CustomUpgrade extends Component
         if (! isInstanceAdmin()) {
             abort(403);
         }
-
-        $this->checkUpdate(fresh: true);
-        if (! $this->isUpdateAvailable || $this->updateStarted) {
-            return;
+        if (! $this->updateStarted) {
+            $this->updateStarted = $this->installLatest('ui.instance.custom_update_started');
         }
+    }
 
+    /**
+     * Installs the newest build when it differs from the running one. Also used by automatic updates.
+     * Returns whether an update was started.
+     */
+    public function installLatest(string $auditEvent = 'instance.custom_update_started'): bool
+    {
+        $this->checkUpdate(fresh: true);
         $server = Server::find(0);
-        if (! $server) {
-            return;
+        if (! $this->isUpdateAvailable || ! $server) {
+            return false;
         }
 
         // Detached on the host: the update restarts this container, which would end a live SSH session.
         instant_remote_process([config('custom_build.update_command')], $server);
-        $this->updateStarted = true;
 
-        auditLog('ui.instance.custom_update_started', [
+        auditLog($auditEvent, [
             'team_id' => null,
             'resource' => 'instance',
             'from_build' => $this->currentSha,
             'to_build' => $this->latestSha,
         ]);
+
+        return true;
     }
 
     protected function fetchLatestBuildSha(): ?string

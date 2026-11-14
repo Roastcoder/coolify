@@ -38,8 +38,9 @@
                     </x-forms.button>
                 @else
                     <x-forms.button type="button" wire:click="update" isHighlighted>
-                        <span wire:loading.remove wire:target="update">
-                            New version available! Update now
+                        <span wire:loading.remove wire:target="update" class="inline-flex items-center gap-1.5">
+                            <x-reicon name="download" class="size-3.5" />
+                            Update now
                         </span>
                         <span wire:loading wire:target="update" class="inline-flex items-center gap-1.5">
                             <svg class="size-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
@@ -49,14 +50,6 @@
                             <span>Starting update…</span>
                         </span>
                     </x-forms.button>
-                    @if (filled($currentSha) && filled($latestSha))
-                        <a href="https://github.com/{{ config('custom_build.repository') }}/commit/{{ $latestSha }}"
-                            target="_blank" rel="noopener"
-                            title="View changelog commit on GitHub"
-                            class="text-xs font-mono text-neutral-400 hover:text-black dark:hover:text-white underline underline-offset-2">
-                            {{ substr($currentSha, 0, 7) }} &rarr; {{ substr($latestSha, 0, 7) }}
-                        </a>
-                    @endif
                 @endif
             </div>
         @else
@@ -76,11 +69,5 @@
             @endif
         @endif
     @else
-        @if ($fullButton)
-            <x-forms.button type="button" disabled class="opacity-60 cursor-default">
-                <x-reicon name="check" class="size-3.5 text-success" />
-                <span>Latest version ({{ substr($currentSha ?? 'latest', 0, 7) }})</span>
-            </x-forms.button>
-        @endif
     @endif
 </div>

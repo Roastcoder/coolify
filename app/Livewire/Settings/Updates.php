@@ -39,6 +39,17 @@ class Updates extends Component
     #[Validate('nullable|required_if:update_channel,custom|string|max:128|regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/')]
     public ?string $update_custom_tag = null;
 
+    /** Build status for the version card, loaded after the page renders (it asks GitHub or the registry). */
+    public bool $statusLoaded = false;
+
+    public ?string $currentSha = null;
+
+    public ?string $latestSha = null;
+
+    public bool $updateAvailable = false;
+
+    public ?string $checkedAt = null;
+
     public function mount()
     {
         if (! isInstanceAdmin()) {
@@ -178,6 +189,18 @@ class Updates extends Component
         }
     }
 
+    public function loadStatus(bool $fresh = false): void
+    {
+        $upgrade = app(CustomUpgrade::class);
+        $upgrade->mount();
+        $upgrade->checkUpdate(fresh: $fresh);
+        $this->currentSha = $upgrade->currentSha;
+        $this->latestSha = $upgrade->latestSha;
+        $this->updateAvailable = $upgrade->isUpdateAvailable;
+        $this->checkedAt = Cache::get(CustomUpgrade::CHECKED_AT_CACHE_KEY);
+        $this->statusLoaded = true;
+    }
+
     public function checkManually()
     {
         $this->authorize('update', $this->settings);
@@ -188,6 +211,7 @@ class Updates extends Component
         $custom = new CustomUpgrade;
         $custom->mount();
         $custom->checkUpdate(fresh: true);
+        $this->loadStatus();
 
         if ($custom->isUpdateAvailable) {
             $this->dispatch('updateAvailable');
