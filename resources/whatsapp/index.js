@@ -144,6 +144,31 @@ http.createServer(async (request, response) => {
             await client.sendMessage(id._serialized, String(text || ''));
             return reply(response, 200, { sent: true });
         }
+        // The owner's own 1:1 chats, for training a model on their style. Names are replaced by Me / Them; groups,
+        // broadcasts and the bot's own chat are left out. Nothing is stored here: the caller gets it as JSON.
+        if (request.method === 'GET' && request.url === '/export') {
+            if (state !== 'ready') {
+                return reply(response, 409, { error: 'WhatsApp is not linked.' });
+            }
+            const own = [client.info?.wid?._serialized, meLid].filter(Boolean);
+            const pad = (n) => String(n).padStart(2, '0');
+            const chats = [];
+            for (const chat of (await client.getChats()).slice(0, 300)) {
+                if (chat.isGroup || chat.id._serialized.endsWith('@broadcast') || own.includes(chat.id._serialized)) {
+                    continue;
+                }
+                const messages = (await chat.fetchMessages({ limit: 500 })).filter((m) => m.type === 'chat' && m.body);
+                if (!messages.some((m) => m.fromMe)) {
+                    continue;
+                }
+                chats.push(messages.map((m) => {
+                    const d = new Date(m.timestamp * 1000);
+                    const when = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    return `${when} - ${m.fromMe ? 'Me' : 'Them'}: ${m.body}`;
+                }).join('\n'));
+            }
+            return reply(response, 200, { chats });
+        }
         if (request.method === 'POST' && request.url === '/logout') {
             await client.logout().catch(() => {});
             reply(response, 200, { ok: true });

@@ -14,6 +14,7 @@ class AiSettings extends Model
 
     public const MODELS = [
         'local:qwen3:1.7b' => 'Local Qwen3 1.7B (free, runs on your server, basic)',
+        'local:yogii' => 'Yogii (your own trained model, runs on your server)',
         'claude-opus-5-5' => 'Claude Opus 5.5 (best)',
         'claude-sonnet-5-5' => 'Claude Sonnet 5.5 (faster, cheaper)',
         'claude-haiku-5-5' => 'Claude Haiku 5.5 (cheapest)',
