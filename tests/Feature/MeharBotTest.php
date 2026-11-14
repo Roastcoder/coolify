@@ -87,7 +87,7 @@ it('uploads a document sent on WhatsApp to the open loan file', function () {
 
 it('logs out when the backend says the token expired', function () {
     meharLogin($this->bot);
-    Http::fake(['mehar.test/api/external/surepass/rc' => Http::response(['error' => 'expired'], 401)]);
+    Http::fake(['mehar.test/api/external/surepass/rc-full' => Http::response(['error' => 'expired'], 401)]);
     ($this->bot)()->handle('3');
 
     expect(($this->bot)()->handle('RJ14AB1234')[0])->toContain('login has expired')

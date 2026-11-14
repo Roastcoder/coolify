@@ -448,7 +448,7 @@ class MeharBot
     private function rcSearch(string $vehicle): void
     {
         $vehicle = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $vehicle));
-        $response = $this->authed()?->post('/api/external/surepass/rc', ['id_number' => $vehicle]);
+        $response = $this->authed()?->post('/api/external/surepass/rc-full', ['id_number' => $vehicle]);
         if (! $response) {
             return;
         }
