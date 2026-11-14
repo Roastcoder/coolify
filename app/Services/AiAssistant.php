@@ -8,6 +8,7 @@ use App\Models\AiSettings;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -173,8 +174,12 @@ class AiAssistant
                 return match ($e->response->status()) {
                     401 => 'The Claude API key is not valid. Check Settings > AI assistant.',
                     429 => 'Claude is rate limited right now. Try again in a minute.',
-                    default => 'Claude API error ('.$e->response->status().'): '.Str::limit((string) data_get($e->response->json(), 'error.message', ''), 200),
+                    default => 'AI error ('.$e->response->status().'): '.Str::limit((string) data_get($e->response->json(), 'error.message', ''), 200),
                 };
+            } catch (ConnectionException) {
+                $conversation->update(['messages' => $messages]);
+
+                return 'The AI is not reachable right now. Try again in a minute.';
             }
 
             $messages[] = ['role' => 'assistant', 'content' => $response['content'] ?? []];
@@ -331,7 +336,7 @@ class AiAssistant
         }
         try {
             return match ($name) {
-                'list_resources' => json_encode($this->listResources($user), JSON_UNESCAPED_SLASHES),
+                'list_resources' => $this->summary($servers = $this->listResources($user))."\n\nDetails: ".json_encode($servers, JSON_UNESCAPED_SLASHES),
                 'get_logs' => $this->logs($user, (string) ($input['uuid'] ?? ''), (int) ($input['lines'] ?? 100)),
                 'deploy_application', 'restart_application' => $this->deploy($user, (string) ($input['uuid'] ?? ''), $name === 'restart_application', (bool) ($input['force_rebuild'] ?? false)),
                 'stop_application' => $this->stop($user, (string) ($input['uuid'] ?? '')),
@@ -362,6 +367,20 @@ class AiAssistant
             'databases' => $server->databases()->map(fn ($db) => ['uuid' => $db->uuid, 'name' => $db->name, 'type' => class_basename($db), 'status' => $db->status])->values(),
             'services' => $server->services()->get()->map(fn ($service) => ['uuid' => $service->uuid, 'name' => $service->name, 'status' => $service->status])->values(),
         ])->all();
+    }
+
+    /** A plain-English summary first: small local models misread counts in long JSON. */
+    private function summary(array $servers): string
+    {
+        $all = collect($servers)->flatMap(fn (array $server) => collect(['applications', 'databases', 'services'])
+            ->flatMap(fn (string $kind) => collect($server[$kind])->map(fn (array $item) => [$kind, $item['name'], (string) $item['status']])));
+        $down = $all->reject(fn (array $item) => str_starts_with($item[2], 'running'));
+        $count = fn (string $kind) => $all->where(0, $kind)->count();
+
+        return sprintf('Summary: %d server(s) (%s), %d application(s), %d database(s), %d service(s). %s',
+            count($servers), collect($servers)->pluck('name')->implode(', ') ?: 'none',
+            $count('applications'), $count('databases'), $count('services'),
+            $down->isEmpty() ? 'Everything is running.' : 'Not running: '.$down->map(fn (array $item) => "{$item[1]} ({$item[2]})")->implode(', ').'.');
     }
 
     /** Finds a resource of one of the user's teams, or fails. */

@@ -188,3 +188,11 @@ it('runs the local model in Ollama without an API key, with thinking off', funct
         && $request['model'] === 'qwen3:1.7b' && $request['thinking'] === ['type' => 'disabled'] && ! $request->hasHeader('x-api-key'));
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'anthropic.com'));
 });
+
+it('starts the resource list with a plain summary for small models', function () {
+    $summary = (fn (array $servers) => $this->summary($servers))->call(new AiAssistant, [
+        ['name' => 'main', 'applications' => [['name' => 'api', 'status' => 'running:healthy'], ['name' => 'web', 'status' => 'exited']], 'databases' => [], 'services' => []],
+    ]);
+
+    expect($summary)->toBe('Summary: 1 server(s) (main), 2 application(s), 0 database(s), 0 service(s). Not running: web (exited).');
+});
