@@ -192,7 +192,7 @@
                 </div>
                 <div class="mt-3 flex items-baseline justify-between gap-2">
                     <span class="text-[17px] font-bold tracking-tight text-neutral-900 dark:text-white">
-                        Maddy + Webmail
+                        Mail + Webmail
                     </span>
                     <span class="sc-pill bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20 text-[10px]">
                         Built-in

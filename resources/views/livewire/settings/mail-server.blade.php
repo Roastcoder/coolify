@@ -6,7 +6,7 @@
     <x-settings.layout>
         <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
             <x-application.settings-section title="Mail server"
-                description="A small built-in mail server (Maddy) running next to Coolify. Mailboxes work with any mail app over IMAP and SMTP.">
+                description="A built-in mail server running on this panel. Mailboxes work with any mail app over IMAP and SMTP.">
                 <x-slot:actions>
                     @if ($domains->isNotEmpty())
                         @if ($running)
