@@ -201,3 +201,54 @@ it('lets an approver approve a payment with remarks, and hides that from others'
     expect(($this->bot)()->handle('1')[0])->toContain('*2* All fields')->not->toContain('Approve');
     expect(($this->bot)()->handle('3')[0])->toContain('Pick a number');
 });
+
+it('understands chat as well as the menu', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/loans?search=jaygopal' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737', 'applicant_name' => 'JAYGOPAL'], ['id' => 8, 'loan_number' => 'MEHCAR0800', 'applicant_name' => 'JAYGOPAL S']]]),
+        'mehar.test/api/loans?search=MEHCAR0737' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737']]]),
+        'mehar.test/api/loans?search=*' => Http::response(['data' => []]),
+        'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'MEHCAR0737']]),
+        'mehar.test/api/pdf/loan/7' => Http::response('%PDF', 200, ['Content-Type' => 'application/pdf']),
+        'mehar.test/api/external/surepass/rc-full' => Http::response(['data' => ['vehicle_chasi_number' => 'C1', 'vehicle_engine_number' => 'E1']]),
+        'mehar.test/api/external/surepass/challan' => Http::response(['data' => ['challan_details' => []]]),
+    ]);
+
+    expect(($this->bot)()->handle('jaygopal ki file')[0])->toContain('*Loan files*')->toContain('MEHCAR0800');
+    expect(($this->bot)()->handle('RJ60HS6517 ka challan')[0])->toContain('No challans found');
+    $replies = ($this->bot)()->handle('MEHCAR0737 pdf');
+    expect($replies[0])->toContain('Loan file MEHCAR0737')->and($replies[1]['filename'])->toBe('Loan-MEHCAR0737.pdf');
+    expect(($this->bot)()->handle('1')[0])->toBeArray(); // numbers still pick menu options
+    Http::assertSent(fn (Request $r) => str_contains($r->url(), 'search=jaygopal'));
+});
+
+it('sends a name that finds nothing, or a question, to Yogii', function () {
+    AiSettings::current()->update(['model' => AiSettings::LOCAL_PREFIX.'yogii:latest']);
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/loans?search=*' => Http::response(['data' => []]),
+        'coolify-ollama:11434/api/chat' => Http::response(['message' => ['content' => 'Yogii here.']]),
+    ]);
+
+    expect(($this->bot)()->handle('good morning team')[0])->toContain('Yogii here.');
+    expect(($this->bot)()->handle('how does foreclosure work?')[0])->toContain('Yogii here.');
+});
+
+it('shows saved CIBIL reports to managers only, without pulling new ones', function () {
+    meharLogin($this->bot); // logged in as a manager
+    Http::fake([
+        'mehar.test/api/loans?search=*' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737']]]),
+        'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'MEHCAR0737']]),
+        'mehar.test/api/credit-reports/loan/7' => Http::response([['provider' => 'cibil', 'score' => '742', 'customer_name' => 'JAYGOPAL', 'created_at' => '2026-10-01T05:00:00.000Z', 'report_link' => '/uploads/credit-reports/r.pdf']]),
+        'mehar.test/uploads/credit-reports/r.pdf' => Http::response('%PDF', 200, ['Content-Type' => 'application/pdf']),
+    ]);
+
+    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('*6* CIBIL reports');
+    expect(($this->bot)()->handle('6')[0])->toContain('*1* CIBIL · Score 742 · JAYGOPAL · 01 Oct 2026');
+    expect(($this->bot)()->handle('1')[0]['filename'])->toBe('CIBIL-MEHCAR0737-1.pdf');
+    Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'credit-report') && $r->method() === 'POST');
+
+    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'sales'], 60);
+    expect(($this->bot)()->handle('MEHCAR0737')[0])->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('6')[0])->toContain('Pick a number');
+});

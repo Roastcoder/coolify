@@ -95,6 +95,7 @@ class MeharBot
             'loans' => $this->openFromList($text, fn (string $id) => $this->showLoan($id)),
             'loan' => $this->loanChoice($text),
             'documents' => $this->documentChoice($text),
+            'cibil' => $this->creditReportChoice($text),
             'upload' => $this->upload($text, $media),
             'find-payment' => $this->findPayments($text),
             'payments' => $this->openFromList($text, fn (string $id) => $this->showPayment($id)),
@@ -109,31 +110,60 @@ class MeharBot
     }
 
     /**
-     * Typed straight in, without picking a menu number first: "rc RJ14AB1234", "challan …", "payment …", "loan …",
-     * or a bare loan, file or vehicle number from any list or detail screen.
+     * Chat instead of the menu: "jaygopal ki file", "RJ60HS6517 ka challan", "MEHCAR0737 pdf", "payment of MEHCAR0737",
+     * "rc RJ14AB1234". Numbers still pick menu options; anything that is not a search goes on to the screen or to Yogii.
      */
     private function direct(string $text): bool
     {
-        if (preg_match('/^(rc|challan|loan|payment|pay)\s+(.+)$/i', $text, $m)) {
-            $query = trim($m[2]);
-            match (strtolower($m[1])) {
-                'rc' => [$this->session['step'] = 'rc', $this->rcSearch($query)],
-                'challan' => [$this->session['step'] = 'challan', $this->challanCheck($query)],
-                'loan' => $this->findLoans($query),
-                default => $this->findPayments($query),
-            };
-
-            return true;
+        // Numbers pick menu options, and a screen waiting for a search or a vehicle number gets the text as typed.
+        $lower = Str::lower($text);
+        $has = fn (string $words) => (bool) preg_match('/\b('.$words.')\b/u', $lower);
+        $waiting = in_array($this->step(), ['find-loan', 'find-payment', 'rc', 'challan'], true);
+        if (ctype_digit($text) || ($waiting && ! $has('rc|challans?|chalan|loan|file|payments?|pay|pdf|download|docs?|documents?|owner'))) {
+            return false;
         }
-        // A single token with letters and digits (MEHCAR0737, RJ60HS6517) is a loan, file or vehicle number.
-        $browsing = in_array($this->step(), ['menu', 'loans', 'loan', 'documents', 'payments', 'payment'], true);
-        if ($browsing && preg_match('/^(?=.*\d)(?=.*[a-z])[a-z0-9\-\/ ]{5,20}$/i', $text) && ! str_contains(trim($text), '  ')) {
-            $this->findLoans($text);
+        $vehicle = preg_match('/\b([a-z]{2}\s?\d{1,2}\s?[a-z]{0,3}\s?\d{4})\b/i', $text, $m) ? strtoupper(preg_replace('/\s/', '', $m[1])) : null;
+        $code = preg_match('/\b((?=[a-z\-\/]*\d)(?=[\d\-\/]*[a-z])[a-z0-9\-\/]{5,20})\b/i', $text, $m) ? strtoupper($m[1]) : null;
+        $identifier = $vehicle ?? $code;
 
-            return true;
+        if ($identifier && $has('challans?|chalan|e-?challan')) {
+            $this->session['step'] = 'challan';
+            $this->challanCheck($identifier);
+        } elseif ($identifier && $has('rc|owner|registration|vahan|rc details')) {
+            $this->session['step'] = 'rc';
+            $this->rcSearch($identifier);
+        } elseif ($identifier && $has('payments?|pay|utr|voucher')) {
+            $this->findPayments($identifier);
+        } elseif ($identifier) {
+            $this->findLoans($identifier);
+            // "MEHCAR0737 pdf" / "… documents" go one step further when the number opened a single file.
+            if (($this->session['step'] ?? null) === 'loan' && $has('pdf|download')) {
+                $this->loanChoice('1');
+            } elseif (($this->session['step'] ?? null) === 'loan' && $has('docs?|documents?|kagaz|papers')) {
+                $this->loanChoice('2');
+            }
+        } elseif ($name = $this->nameIn($lower)) {
+            // A name, alone or in a sentence ("jaygopal ki file", "show loan of ravi kumar"): search, or let Yogii answer.
+            if (! $this->findLoans($name, quiet: true)) {
+                return false;
+            }
+        } else {
+            return false;
         }
 
-        return false;
+        return true;
+    }
+
+    /** The name in a short search sentence, without the filler words; null for questions and longer chat. */
+    private function nameIn(string $lower): ?string
+    {
+        if (str_contains($lower, '?') || str_word_count($lower) > 6) {
+            return null;
+        }
+        $filler = '/\b(show|find|search|open|get|check|details?|of|for|the|a|an|me|my|please|pls|plz|loan|loans|file|files|customer|applicant|name|ki|ka|ke|ko|dikhao|dikha|batao|bata|do|hai|wala|wali|kaun|kya)\b/u';
+        $name = trim(preg_replace('/\s+/', ' ', preg_replace($filler, ' ', $lower)));
+
+        return preg_match('/^[\p{L} .]{3,40}$/u', $name) && ! in_array($name, ['hi', 'hello', 'thanks', 'thank you', 'ok', 'okay', 'yes', 'no', 'help'], true) ? $name : null;
     }
 
     // Login
@@ -226,7 +256,7 @@ class MeharBot
     private function menu(string $lead = ''): void
     {
         $this->session['step'] = 'menu';
-        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n\n*1* Find a loan file\n*2* Find a payment application\n*3* RC search\n*4* Challan check\n*9* Log out\n\nReply with a number, or type a loan or vehicle number straight in. *menu* brings you back here."));
+        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n\n*1* Find a loan file\n*2* Find a payment application\n*3* RC search\n*4* Challan check\n*9* Log out\n\nReply with a number, or just type what you need: *MEHCAR0737*, *jaygopal ki file*, *RJ60HS6517 challan*, *rc RJ60HS6517*, *MEHCAR0737 pdf*. *menu* brings you back here."));
     }
 
     private function menuChoice(string $text): void
@@ -253,17 +283,20 @@ class MeharBot
 
     // Loan files
 
-    private function findLoans(string $search): void
+    /** Returns how many files were found. Quiet: says nothing when there are none, so the caller can try something else. */
+    private function findLoans(string $search, bool $quiet = false): int
     {
         $response = $this->authed()?->get('/api/loans', ['search' => $search]);
         if (! $response) {
-            return;
+            return -1;
         }
         $loans = collect($response->json('data', $response->json()) ?? [])->take(self::LIST_LIMIT)->values();
         if ($loans->isEmpty()) {
-            $this->say("No loan file found for \"{$search}\". Try another number or name.\n\n*0* Back");
+            if (! $quiet) {
+                $this->say("No loan file found for \"{$search}\". Try another number or name.\n\n*0* Back");
+            }
 
-            return;
+            return 0;
         }
         // A typed loan, file or vehicle number that matches one file exactly opens it straight away.
         $key = fn ($value) => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $value));
@@ -271,11 +304,13 @@ class MeharBot
         if ($exact->count() === 1) {
             $this->showLoan((string) $exact->first()['id']);
 
-            return;
+            return 1;
         }
         $this->session['step'] = 'loans';
         $this->session['list'] = $loans->pluck('id')->map(fn ($id) => (string) $id)->all();
         $this->say("*Loan files*\n".$loans->map(fn (array $loan, int $i) => ($i + 1).'. '.$this->loanLine($loan))->implode("\n")."\n\nReply with a number to open one. *0* Back");
+
+        return $loans->count();
     }
 
     private function loanLine(array $loan): string
@@ -350,7 +385,7 @@ class MeharBot
         })->filter();
 
         $this->say(Str::limit("📁 *Loan file {$number}*\n\n".$sections->implode("\n\n"), 3600)
-            ."\n\n*Reply with a number*\n*1* Loan PDF\n*2* Documents\n*3* Upload a document\n*4* Payment applications\n*5* All fields\n*0* Back");
+            ."\n\n*Reply with a number*\n*1* Loan PDF\n*2* Documents\n*3* Upload a document\n*4* Payment applications\n*5* All fields".($this->canSeeCibil() ? "\n*6* CIBIL reports" : '')."\n*0* Back");
     }
 
     /** One value as people read it: rupees, dates, masked IDs, Yes/No. */
@@ -384,9 +419,10 @@ class MeharBot
             '2' => $this->listDocuments($loan['id']),
             '3' => $this->askUpload(),
             '4' => $this->paymentsOfLoan($loan),
+            '6' => $this->canSeeCibil() ? $this->creditReports($loan['id']) : $this->say('Pick a number from the list.'),
             '5' => $this->fullDetails("/api/loans/{$loan['id']}", "📋 *Loan file {$loan['number']}: all fields*"),
             '0' => $this->findLoansAgain(),
-            default => $this->say('Pick 1 to 5, or *0* to go back.'),
+            default => $this->say('Pick a number from the list, or *0* to go back.'),
         };
     }
 
@@ -659,12 +695,74 @@ class MeharBot
         $this->say(($reply !== '' ? $reply : 'I did not get that.')."\n\nSend *menu* for the options.");
     }
 
+    // CIBIL: view and download reports already pulled in the dashboard. Admins and managers only; no new pulls here.
+
+    private function canSeeCibil(): bool
+    {
+        $role = strtolower($this->session['role'] ?? '');
+
+        return in_array($role, ['super_admin', 'admin', 'company_admin', 'franchise_admin', 'manager', 'rbm'], true) || str_ends_with($role, '_manager');
+    }
+
+    private function creditReports(string $loanId): void
+    {
+        $response = $this->authed()?->get("/api/credit-reports/loan/{$loanId}");
+        if (! $response) {
+            return;
+        }
+        $reports = collect($response->json('data', $response->json()) ?? [])->take(10)->values();
+        if ($reports->isEmpty()) {
+            $this->say("No CIBIL report has been pulled for this file yet. Pull one from the dashboard.\n\n*0* Back");
+            $this->session['step'] = 'cibil';
+            $this->session['reports'] = [];
+
+            return;
+        }
+        $this->session['step'] = 'cibil';
+        $this->session['reports'] = $reports->map(fn (array $r) => $r['report_link'] ?? null)->all();
+        $this->say("📊 *CIBIL reports: {$this->session['loan']['number']}*\n\n".$reports->map(fn (array $r, int $i) => '*'.($i + 1).'* '.collect([
+            strtoupper((string) ($r['provider'] ?? 'CIBIL')),
+            ($r['score'] ?? null) === 'FAILED' ? 'Failed' : (filled($r['score'] ?? null) ? 'Score '.$r['score'] : null),
+            $r['customer_name'] ?? null,
+            isset($r['created_at']) ? $this->value('created_at', $r['created_at']) : null,
+            isset($r['created_by_name']) ? 'by '.$r['created_by_name'] : null,
+        ])->filter()->implode(' · '))->implode("\n")."\n\nReply with a number to download that report. *0* Back");
+    }
+
+    private function creditReportChoice(string $text): void
+    {
+        if ($text === '0') {
+            $this->showLoan($this->session['loan']['id']);
+
+            return;
+        }
+        $index = ctype_digit($text) ? (int) $text - 1 : -1;
+        if (! array_key_exists($index, $this->session['reports'] ?? [])) {
+            $this->say('Reply with a number from the list, or *0* to go back.');
+
+            return;
+        }
+        $link = $this->session['reports'][$index];
+        if (blank($link)) {
+            $this->say('That report has no PDF. Pick another, or *0* to go back.');
+
+            return;
+        }
+        $this->sendPdf($link, "CIBIL-{$this->session['loan']['number']}-".($index + 1).'.pdf', "CIBIL report, loan file {$this->session['loan']['number']}");
+    }
+
     // Files
 
     private function sendPdf(string $path, string $filename, string $caption): void
     {
-        $response = $this->authed(fn (PendingRequest $request) => $request->accept('*/*'))?->get($path);
-        if (! $response) {
+        // The user's token goes only to the Mehar backend: links elsewhere are fetched without it.
+        $foreign = preg_match('#^https?://#i', $path) && parse_url($path, PHP_URL_HOST) !== parse_url((string) $this->apiUrl, PHP_URL_HOST);
+        $response = $foreign
+            ? Http::timeout(90)->get($path)
+            : $this->authed(fn (PendingRequest $request) => $request->accept('*/*'))?->get($path);
+        if (! $response || ! $response->successful()) {
+            $response && $this->say("That file could not be downloaded.\n\n*0* Back");
+
             return;
         }
         $this->replies[] = ['text' => $caption, 'file' => $response->body(), 'filename' => $filename, 'mimetype' => $response->header('Content-Type') ?: 'application/pdf'];
