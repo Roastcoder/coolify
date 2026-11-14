@@ -2,6 +2,7 @@
 // It links one WhatsApp account through WhatsApp Web (scan the QR code in Settings > AI assistant),
 // forwards incoming chats (and the owner's own "Message yourself" chat) to the app and sends the messages Coolify asks for.
 // Every request in both directions carries the shared secret in the X-Whatsapp-Secret header.
+const fs = require('node:fs');
 const http = require('node:http');
 const crypto = require('node:crypto');
 const QRCode = require('qrcode');
@@ -141,5 +142,10 @@ http.createServer(async (request, response) => {
         reply(response, 500, { error: error.message });
     }
 }).listen(PORT, () => console.log('WhatsApp gateway on port', PORT));
+
+// A hard stop (server reboot) leaves Chromium's profile lock behind, and Chromium then refuses to start. Only this container uses the profile.
+for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+    fs.rmSync(`/data/session/${name}`, { force: true });
+}
 
 client.initialize();
