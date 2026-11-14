@@ -122,6 +122,7 @@
                             ['label' => 'Analytics', 'icon' => 'analytics', 'href' => route('analytics'), 'active' => request()->is('analytics')],
                             ['label' => 'Metrics', 'icon' => 'graph', 'href' => route('metrics'), 'active' => request()->is('metrics')],
                         ]],
+                        ['label' => 'AI', 'icon' => 'brain', 'href' => route('ai.index'), 'active' => request()->is('ai'), 'visible' => $teamWide && isInstanceAdmin()],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [
@@ -172,6 +173,7 @@
                             ['label' => 'Authentication', 'icon' => 'keys', 'href' => route('settings.oauth'), 'active' => request()->is('settings/oauth*'), 'sectionStart' => true],
                             ['label' => 'Email', 'icon' => 'mail', 'href' => route('settings.email'), 'active' => request()->is('settings/email')],
                             ['label' => 'Mail server', 'icon' => 'mail', 'href' => route('settings.mail-server'), 'active' => request()->is('settings/mail-server')],
+                            ['label' => 'AI assistant', 'icon' => 'brain', 'href' => route('settings.ai'), 'active' => request()->is('settings/ai')],
                             ['label' => 'Backup', 'icon' => 'database', 'href' => route('settings.backup'), 'active' => request()->is('settings/backup')],
                         ]],
                     ],

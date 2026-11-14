@@ -1,0 +1,125 @@
+// Fork-only: the built-in WhatsApp gateway (container coolify-whatsapp), started by App\Services\WhatsappGateway.
+// It links one WhatsApp account through WhatsApp Web (scan the QR code in Settings > AI assistant),
+// forwards incoming chats to Coolify and sends the messages Coolify asks for.
+// Every request in both directions carries the shared secret in the X-Whatsapp-Secret header.
+const http = require('node:http');
+const crypto = require('node:crypto');
+const QRCode = require('qrcode');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+
+const SECRET = process.env.SECRET || '';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
+const PORT = Number(process.env.PORT || 3000);
+
+if (SECRET.length < 32) {
+    console.error('SECRET is missing.');
+    process.exit(1);
+}
+
+let state = 'starting';
+let qr = null;
+let me = null;
+
+const client = new Client({
+    authStrategy: new LocalAuth({ dataPath: '/data' }),
+    puppeteer: {
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+        args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    },
+});
+
+client.on('qr', async (code) => {
+    state = 'qr';
+    qr = await QRCode.toDataURL(code, { margin: 1, width: 280 });
+});
+client.on('ready', () => {
+    state = 'ready';
+    qr = null;
+    me = client.info?.wid?.user ?? null;
+    console.log('WhatsApp linked:', me);
+});
+client.on('auth_failure', () => { state = 'disconnected'; });
+client.on('disconnected', (reason) => {
+    console.log('WhatsApp disconnected:', reason);
+    state = 'disconnected';
+    me = null;
+    // Exit so Docker restarts the container and a new QR code is shown.
+    setTimeout(() => process.exit(1), 2000);
+});
+
+client.on('message', async (message) => {
+    if (message.fromMe || message.type !== 'chat' || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
+        return;
+    }
+    try {
+        const contact = await message.getContact();
+        await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Whatsapp-Secret': SECRET },
+            body: JSON.stringify({ id: message.id._serialized, number: contact.number || '', body: message.body }),
+        });
+    } catch (error) {
+        console.error('Could not forward a message:', error.message);
+    }
+});
+
+function authorized(request) {
+    const given = Buffer.from(String(request.headers['x-whatsapp-secret'] || ''));
+    const expected = Buffer.from(SECRET);
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
+function reply(response, status, body) {
+    response.writeHead(status, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(body));
+}
+
+function readJson(request) {
+    return new Promise((resolve, reject) => {
+        let data = '';
+        request.on('data', (chunk) => {
+            data += chunk;
+            if (data.length > 1_000_000) {
+                request.destroy();
+                reject(new Error('Too large'));
+            }
+        });
+        request.on('end', () => {
+            try { resolve(JSON.parse(data || '{}')); } catch (error) { reject(error); }
+        });
+    });
+}
+
+http.createServer(async (request, response) => {
+    if (!authorized(request)) {
+        return reply(response, 401, { error: 'unauthorized' });
+    }
+    try {
+        if (request.method === 'GET' && request.url === '/status') {
+            return reply(response, 200, { state, qr, me });
+        }
+        if (request.method === 'POST' && request.url === '/send') {
+            if (state !== 'ready') {
+                return reply(response, 409, { error: 'WhatsApp is not linked.' });
+            }
+            const { to, text } = await readJson(request);
+            const id = await client.getNumberId(String(to || '').replace(/\D/g, ''));
+            if (!id) {
+                return reply(response, 404, { error: 'This number is not on WhatsApp.' });
+            }
+            await client.sendMessage(id._serialized, String(text || ''));
+            return reply(response, 200, { sent: true });
+        }
+        if (request.method === 'POST' && request.url === '/logout') {
+            await client.logout().catch(() => {});
+            reply(response, 200, { ok: true });
+            setTimeout(() => process.exit(0), 500);
+            return;
+        }
+        reply(response, 404, { error: 'not found' });
+    } catch (error) {
+        reply(response, 500, { error: error.message });
+    }
+}).listen(PORT, () => console.log('WhatsApp gateway on port', PORT));
+
+client.initialize();

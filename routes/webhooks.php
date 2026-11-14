@@ -5,6 +5,7 @@ use App\Http\Controllers\Webhook\Gitea;
 use App\Http\Controllers\Webhook\Github;
 use App\Http\Controllers\Webhook\Gitlab;
 use App\Http\Controllers\Webhook\Stripe;
+use App\Http\Controllers\Webhook\Whatsapp;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth', 'throttle:60,1'])->group(function () {
@@ -26,3 +27,6 @@ Route::post('/source/gitea/events', [Gitea::class, 'normal']);
 Route::post('/source/gitea/events/manual', [Gitea::class, 'manual']);
 
 Route::post('/payments/stripe/events', [Stripe::class, 'events']);
+
+// Fork-only: incoming chats from the built-in WhatsApp gateway, guarded by its shared secret.
+Route::post('/whatsapp', Whatsapp::class)->middleware('throttle:120,1')->name('webhooks.whatsapp');

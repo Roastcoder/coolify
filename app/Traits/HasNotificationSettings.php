@@ -8,6 +8,7 @@ use App\Notifications\Channels\PushoverChannel;
 use App\Notifications\Channels\SlackChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Channels\WebhookChannel;
+use App\Notifications\Channels\WhatsappChannel;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasNotificationSettings
@@ -92,6 +93,11 @@ trait HasNotificationSettings
             if ($this->isNotificationEnabled($channel) && $this->isNotificationTypeEnabled($channel, $event)) {
                 $channels[] = $channelClass;
             }
+        }
+
+        // Fork-only: the built-in WhatsApp gateway, set up instance-wide in Settings > AI assistant.
+        if (WhatsappChannel::isEnabledFor($this)) {
+            $channels[] = WhatsappChannel::class;
         }
 
         return $channels;

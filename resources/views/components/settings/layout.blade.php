@@ -9,6 +9,7 @@
             ['label' => 'Authentication', 'route' => 'settings.oauth', 'icon' => 'keys'],
             ['label' => 'Email', 'route' => 'settings.email', 'icon' => 'mail'],
             ['label' => 'Mail server', 'route' => 'settings.mail-server', 'icon' => 'mail'],
+            ['label' => 'AI assistant', 'route' => 'settings.ai', 'icon' => 'brain'],
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],
         ],
     ];

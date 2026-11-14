@@ -26,6 +26,7 @@ use App\Http\Controllers\WebmailController;
 use App\Http\Controllers\WebmailPasswordController;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Ai\Index as AiIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
@@ -112,6 +113,7 @@ use App\Livewire\Server\Show as ServerShow;
 use App\Livewire\Server\Swarm as ServerSwarm;
 use App\Livewire\Server\Transfer as ServerTransfer;
 use App\Livewire\Settings\Advanced as SettingsAdvanced;
+use App\Livewire\Settings\AiAssistant as SettingsAiAssistant;
 use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\MailServer;
 use App\Livewire\Settings\Updates as SettingsUpdates;
@@ -314,6 +316,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings/email', SettingsEmail::class)->name('settings.email');
         // Fork-only: built-in mail server.
         Route::get('/settings/mail-server', MailServer::class)->name('settings.mail-server');
+        // Fork-only: AI assistant and WhatsApp gateway.
+        Route::get('/settings/ai', SettingsAiAssistant::class)->name('settings.ai');
+        Route::get('/ai', AiIndex::class)->name('ai.index');
         Route::get('/settings/oauth', SettingsOauth::class)->name('settings.oauth');
         Route::get('/settings/oauth/{provider}', SettingsOauth::class)
             ->where('provider', '[A-Za-z0-9_-]+')
