@@ -283,56 +283,53 @@ class MeharBot
         $attempts = $this->session['attempts'] ?? 0;
 
         if ($step === null || in_array(strtolower($text), ['login', 'mehar'], true)) {
-            $this->session = ['step' => 'login-choice'];
-            $this->say("*Yogii · Mehar Advisory login*\n\n*1* OTP to this WhatsApp number\n*2* ID and password\n\nReply with a number.");
-
-            return;
-        }
-        if ($step === 'login-choice' && $text === '1') {
-            $response = $this->api()->post('/api/auth/request-otp', ['phone' => $this->phone(), 'purpose' => 'login']);
-            if ($response->status() === 404) {
-                $this->say("No dashboard account uses this number.\nReply *2* to log in with your ID and password.");
-
-                return;
-            }
-            if (! $response->successful()) {
-                $this->say('Could not send the OTP: '.$this->error($response));
-
-                return;
-            }
-            $this->session['step'] = 'otp';
-            $this->say('An OTP was sent to your registered mobile. Send the 6 digits here.');
-
-            return;
-        }
-        if ($step === 'login-choice' && $text === '2') {
-            $this->session['step'] = 'login-id';
-            $this->say('Send your login ID (email or mobile number).');
-
-            return;
-        }
-        if ($step === 'otp' && preg_match('/^\d{4,8}$/', $text)) {
-            $response = $this->api()->post('/api/auth/verify-otp', ['phone' => $this->phone(), 'otp' => $text, 'purpose' => 'login']);
-            $this->finishLogin($response, $attempts, 'Wrong or expired OTP.');
+            $this->session = ['step' => 'login-id'];
+            $this->say("*Yogii · Mehar Advisory login*\n\nSend your registered *mobile number* or *email*.");
 
             return;
         }
         if ($step === 'login-id' && $text !== '') {
+            $digits = preg_replace('/\D/', '', $text);
+            // A mobile number gets an OTP by SMS; anything else (an email or user ID) gets a password.
+            if (! str_contains($text, '@') && strlen($digits) >= 10 && strlen($digits) <= 12 && preg_match('/^[\d\s+\-()]+$/', $text)) {
+                $phone = substr($digits, -10);
+                $response = $this->api()->post('/api/auth/request-otp', ['phone' => $phone, 'purpose' => 'login']);
+                if ($response->status() === 404) {
+                    $this->say("No dashboard account uses this number.\nSend another mobile number, or your *email* to log in with a password.");
+
+                    return;
+                }
+                if (! $response->successful()) {
+                    $this->say('Could not send the OTP: '.$this->error($response));
+
+                    return;
+                }
+                $this->session['step'] = 'otp';
+                $this->session['login_phone'] = $phone;
+                $this->say('An OTP was sent to ••••••'.substr($phone, -4).'. Send it here.');
+
+                return;
+            }
             $this->session['step'] = 'login-password';
             $this->session['login_id'] = mb_substr($text, 0, 200);
             $this->say("Now send your password.\n\n🔒 After logging in, delete that message from this chat: WhatsApp keeps it in the chat history.");
 
             return;
         }
+        if ($step === 'otp' && preg_match('/^\d{4,8}$/', $text)) {
+            $response = $this->api()->post('/api/auth/verify-otp', ['phone' => $this->session['login_phone'] ?? '', 'otp' => $text, 'purpose' => 'login']);
+            $this->finishLogin($response, $attempts, 'Wrong or expired OTP.');
+
+            return;
+        }
         if ($step === 'login-password' && $text !== '') {
             $response = $this->api()->post('/api/auth/login', ['email' => $this->session['login_id'] ?? '', 'password' => $text]);
-            $this->finishLogin($response, $attempts, 'Wrong ID or password.');
+            $this->finishLogin($response, $attempts, 'Wrong email or password.');
 
             return;
         }
         $this->say(match ($step) {
             'otp' => 'Send the OTP digits, or *login* to start again.',
-            'login-choice' => 'Reply *1* for an OTP or *2* for ID and password.',
             default => 'Send *login* to start again.',
         });
     }
@@ -928,11 +925,6 @@ class MeharBot
     private function error(Response $response): string
     {
         return Str::limit((string) ($response->json('error') ?? $response->json('message') ?? 'error '.$response->status()), 200);
-    }
-
-    private function phone(): string
-    {
-        return substr(preg_replace('/\D/', '', $this->number), -10);
     }
 
     private function money(mixed $amount): string

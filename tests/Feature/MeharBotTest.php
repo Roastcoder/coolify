@@ -41,8 +41,8 @@ function fakeYogii(array $intents = [], string $answer = 'Yogii here.'): Closure
 function meharLogin(Closure $bot): void
 {
     Http::fake(['mehar.test/api/auth/request-otp' => Http::response(['ok' => true]), 'mehar.test/api/auth/verify-otp' => Http::response(['token' => 'tok-1', 'user' => ['name' => 'Asha', 'role' => 'manager']])]);
-    $bot()->handle('login');
-    $bot()->handle('1');
+    expect($bot()->handle('login')[0])->toContain('mobile number* or *email*');
+    expect($bot()->handle('+91 90000 00001')[0])->toContain('OTP was sent to ••••••0001');
     expect(implode("\n", $bot()->handle('123456')))->toContain('Logged in as *Asha*');
 }
 
@@ -52,14 +52,14 @@ it('logs in with an OTP and keeps the token encrypted', function () {
     $session = Cache::get('mehar-bot:919000000001');
     expect($session['token'])->not->toBe('tok-1')->and($session['step'])->toBe('menu');
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/api/auth/request-otp') && $r['phone'] === '9000000001');
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/api/auth/verify-otp') && $r['phone'] === '9000000001' && $r['otp'] === '123456');
 });
 
-it('offers ID and password when the number is unknown, and stops after three wrong tries', function () {
+it('asks for an email and password when the number is unknown, and stops after three wrong tries', function () {
     Http::fake(['mehar.test/api/auth/request-otp' => Http::response(['error' => 'not found'], 404), 'mehar.test/api/auth/login' => Http::response(['error' => 'bad'], 401)]);
     ($this->bot)()->handle('login');
-    expect(($this->bot)()->handle('1')[0])->toContain('Reply *2*');
-    ($this->bot)()->handle('2');
-    ($this->bot)()->handle('asha@example.com');
+    expect(($this->bot)()->handle('9876500000')[0])->toContain('No dashboard account uses this number');
+    expect(($this->bot)()->handle('asha@example.com')[0])->toContain('send your password');
     expect(($this->bot)()->handle('wrong1')[0])->toContain('Try again');
     ($this->bot)()->handle('wrong2');
     expect(($this->bot)()->handle('wrong3')[0])->toContain('Too many tries')
@@ -137,7 +137,7 @@ it('opens Mehar Advisory from the Yogii menu', function () {
 
     expect($assistant->handle($conversation, 'menu'))->toContain('4. 🏦 Mehar Advisory');
     expect($assistant->handle($conversation, '4'))->toContain('Yogii · Mehar Advisory login')
-        ->and(Cache::get('mehar-bot:919000000003')['step'])->toBe('login-choice');
+        ->and(Cache::get('mehar-bot:919000000003')['step'])->toBe('login-id');
 });
 
 it('opens a loan file straight away when the loan number matches exactly', function () {
