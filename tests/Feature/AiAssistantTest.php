@@ -183,7 +183,7 @@ it('runs the local model in Ollama without an API key, with thinking off', funct
     $assistant = new AiAssistant;
 
     expect($assistant->isConfigured())->toBeTrue()
-        ->and($assistant->handle(conversationFor($this->admin, channel: 'web'), 'status?'))->toBe('All apps are up.');
+        ->and($assistant->handle(conversationFor($this->admin, channel: 'web'), 'are my apps fine?'))->toBe('All apps are up.');
     Http::assertSent(fn (Request $request) => $request->url() === 'http://coolify-ollama:11434/v1/messages'
         && $request['model'] === 'qwen3:1.7b' && $request['thinking'] === ['type' => 'disabled'] && ! $request->hasHeader('x-api-key'));
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'anthropic.com'));
@@ -195,4 +195,15 @@ it('starts the resource list with a plain summary for small models', function ()
     ]);
 
     expect($summary)->toBe('Summary: 1 server(s) (main), 2 application(s), 0 database(s), 0 service(s). Not running: web (exited).');
+});
+
+it('answers the common commands instantly without the AI', function () {
+    Http::fake();
+    $assistant = new AiAssistant;
+    $conversation = conversationFor($this->admin);
+
+    expect($assistant->handle($conversation, 'help'))->toContain('*status*')
+        ->and($assistant->handle($conversation, 'Status'))->toStartWith('Summary: 0 server(s)')
+        ->and($assistant->handle($conversation, 'down'))->toBe('Everything is running.');
+    Http::assertNothingSent();
 });

@@ -68,6 +68,9 @@ class AiAssistant
         if (preg_match('/^\/?unlock\s+(.+)$/is', $text, $match)) {
             return $this->unlock($conversation, trim($match[1]));
         }
+        if (! $conversation->pending_action && ($quick = $this->quickReply($conversation->user, $text)) !== null) {
+            return $quick;
+        }
         if (! $this->isConfigured()) {
             return 'The AI assistant is not set up yet. Add a Claude API key in Settings > AI assistant.';
         }
@@ -126,6 +129,25 @@ class AiAssistant
         }
 
         return $json['content'];
+    }
+
+    /** Instant answers without the AI for the common questions. Null when the AI should answer. */
+    private function quickReply(?User $user, string $text): ?string
+    {
+        $command = strtolower(trim($text, " \t\n\r\0\x0B/.!?"));
+        if (in_array($command, ['help', 'menu', 'hi', 'hello', 'hey'], true)) {
+            return "Instant commands:\n*status* - summary of everything\n*apps* - every app and its status\n*down* - what is not running\n\nAsk anything else in your own words and the AI answers (slower).";
+        }
+        if (! $user || ! in_array($command, ['status', 'servers', 'apps', 'down', 'health'], true)) {
+            return null;
+        }
+        $servers = $this->listResources($user);
+        if ($command === 'status' || $command === 'servers' || $command === 'health') {
+            return $this->summary($servers);
+        }
+        $lines = $this->resourceLines($servers, onlyDown: $command === 'down');
+
+        return $lines === '' ? ($command === 'down' ? 'Everything is running.' : 'No apps found.') : $lines;
     }
 
     /** Actions from WhatsApp need the access password; the web app is behind a login already. */
@@ -232,7 +254,7 @@ class AiAssistant
             // Ollama speaks the same Messages API. Thinking off: much faster on CPU and the small model calls tools more reliably without it.
             return Http::timeout(600)->connectTimeout(15)->post('http://coolify-ollama:11434/v1/messages', [
                 'model' => substr($model, strlen(AiSettings::LOCAL_PREFIX)),
-                'max_tokens' => 2048,
+                'max_tokens' => 600,
                 'thinking' => ['type' => 'disabled'],
                 ...$body,
             ])->throw()->json();
@@ -336,7 +358,7 @@ class AiAssistant
         }
         try {
             return match ($name) {
-                'list_resources' => $this->summary($servers = $this->listResources($user))."\n\nDetails: ".json_encode($servers, JSON_UNESCAPED_SLASHES),
+                'list_resources' => $this->summary($servers = $this->listResources($user))."\n\n".$this->resourceLines($servers, withUuid: true),
                 'get_logs' => $this->logs($user, (string) ($input['uuid'] ?? ''), (int) ($input['lines'] ?? 100)),
                 'deploy_application', 'restart_application' => $this->deploy($user, (string) ($input['uuid'] ?? ''), $name === 'restart_application', (bool) ($input['force_rebuild'] ?? false)),
                 'stop_application' => $this->stop($user, (string) ($input['uuid'] ?? '')),
@@ -381,6 +403,16 @@ class AiAssistant
             count($servers), collect($servers)->pluck('name')->implode(', ') ?: 'none',
             $count('applications'), $count('databases'), $count('services'),
             $down->isEmpty() ? 'Everything is running.' : 'Not running: '.$down->map(fn (array $item) => "{$item[1]} ({$item[2]})")->implode(', ').'.');
+    }
+
+    /** One short line per resource: far fewer tokens than JSON, so the local model answers faster. */
+    private function resourceLines(array $servers, bool $onlyDown = false, bool $withUuid = false): string
+    {
+        return collect($servers)->flatMap(fn (array $server) => collect(['applications' => 'app', 'databases' => 'db', 'services' => 'service'])
+            ->flatMap(fn (string $label, string $kind) => collect($server[$kind])
+                ->reject(fn (array $item) => $onlyDown && str_starts_with((string) $item['status'], 'running'))
+                ->map(fn (array $item) => "{$label} {$item['name']}: {$item['status']}".($withUuid ? " (uuid {$item['uuid']}, server {$server['name']} uuid {$server['uuid']})" : ''))))
+            ->implode("\n");
     }
 
     /** Finds a resource of one of the user's teams, or fails. */
