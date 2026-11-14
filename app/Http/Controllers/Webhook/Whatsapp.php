@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\AiWhatsappReplyJob;
+use App\Jobs\MeharBotJob;
 use App\Jobs\SendWhatsappMessageJob;
 use App\Models\AiSettings;
 use App\Models\User;
+use App\Services\MeharBot;
 use App\Services\WhatsappGateway;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +29,18 @@ class Whatsapp extends Controller
         $number = preg_replace('/\D/', '', (string) $request->input('number'));
         $body = trim((string) $request->input('body'));
         $id = (string) $request->input('id');
-        if (strlen($number) < 10 || $body === '' || $id === '' || ! Cache::add('whatsapp-message:'.$id, true, now()->addDay())) {
+        $media = is_array($request->input('media')) ? $request->input('media') : null;
+        if (strlen($number) < 10 || ($body === '' && ! $media) || $id === '' || ! Cache::add('whatsapp-message:'.$id, true, now()->addDay())) {
+            return response()->json(['ok' => true]);
+        }
+
+        // Mehar Advisory dashboard users: "login" starts the bot, and it keeps the chat while the session lasts.
+        if (MeharBot::wants($number, $body)) {
+            MeharBotJob::dispatch($number, mb_substr($body, 0, 2000), $media ? array_intersect_key($media, array_flip(['id', 'mimetype', 'filename', 'size'])) : null);
+
+            return response()->json(['ok' => true]);
+        }
+        if ($body === '') {
             return response()->json(['ok' => true]);
         }
 
@@ -54,7 +67,7 @@ class Whatsapp extends Controller
         Cache::put($key, $step === null ? 'asked' : 'relayed', now()->addHours(12));
 
         if ($step === null) {
-            SendWhatsappMessageJob::dispatch($number, "Hi! I'm the personal assistant for this number. They can't reply right now.\n\nMay I know your name and what you're messaging about? I'll pass it on.");
+            SendWhatsappMessageJob::dispatch($number, "Hi! I'm the personal assistant for this number. They can't reply right now.\n\nMay I know your name and what you're messaging about? I'll pass it on.".(MeharBot::enabled() ? "\n\nMehar Advisory partner? Reply *login* to use the dashboard here." : ''));
 
             return;
         }

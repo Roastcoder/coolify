@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const crypto = require('node:crypto');
 const QRCode = require('qrcode');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 
 const SECRET = process.env.SECRET || '';
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
@@ -55,12 +55,18 @@ client.on('disconnected', (reason) => {
 // Texts this gateway is sending: in the owner's "Message yourself" chat they come back as messages from me.
 const outgoing = new Set();
 
+// Files people send (documents and photos), kept for 15 minutes so the app can fetch the one it needs from GET /media/<id>.
+const media = new Map();
+const MEDIA_TYPES = ['document', 'image'];
+const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
+
 // message_create also fires for messages sent from the linked phone, so the owner can use "Message yourself".
 const mask = (id) => '…' + String(id || '').split('@')[0].slice(-4) + (String(id).includes('@lid') ? '@lid' : '');
 
 client.on('message_create', async (message) => {
     console.log('Event:', message.type, message.fromMe ? 'own' : 'incoming', 'from', mask(message.from), 'to', mask(message.to));
-    if (message.type !== 'chat' || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
+    const isMedia = MEDIA_TYPES.includes(message.type) && message.hasMedia && !message.fromMe;
+    if ((message.type !== 'chat' && !isMedia) || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
         return;
     }
     if (message.fromMe && outgoing.delete(message.body)) {
@@ -84,10 +90,22 @@ client.on('message_create', async (message) => {
                 number = String(match?.pn || '').split('@')[0] || number;
             }
         }
+        let file = null;
+        if (isMedia) {
+            const download = await message.downloadMedia().catch(() => null);
+            const size = download ? Math.floor(download.data.length * 3 / 4) : 0;
+            if (download && size <= MAX_MEDIA_BYTES) {
+                const id = crypto.randomUUID();
+                media.set(id, { mimetype: download.mimetype, data: download.data, filename: download.filename || null });
+                setTimeout(() => media.delete(id), 15 * 60_000);
+                file = { id, mimetype: download.mimetype, filename: download.filename || null, size };
+            }
+        }
         const response = await fetch(WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Whatsapp-Secret': SECRET },
-            body: JSON.stringify({ id: message.id._serialized, number: number || '', body: message.body }),
+            // A photo or document comes with its caption as the body.
+            body: JSON.stringify({ id: message.id._serialized, number: number || '', body: isMedia ? (message.body || '') : message.body, media: file }),
         });
         console.log('Forwarded a message from', number ? '…' + String(number).slice(-4) : 'unknown', message.fromMe ? '(own chat)' : '', '->', response.status);
     } catch (error) {
@@ -111,7 +129,7 @@ function readJson(request) {
         let data = '';
         request.on('data', (chunk) => {
             data += chunk;
-            if (data.length > 1_000_000) {
+            if (data.length > 25_000_000) { // Room for a document of about 15 MB as base64.
                 request.destroy();
                 reject(new Error('Too large'));
             }
@@ -134,15 +152,25 @@ http.createServer(async (request, response) => {
             if (state !== 'ready') {
                 return reply(response, 409, { error: 'WhatsApp is not linked.' });
             }
-            const { to, text } = await readJson(request);
+            const { to, text, file } = await readJson(request);
             const id = await client.getNumberId(String(to || '').replace(/\D/g, ''));
             if (!id) {
                 return reply(response, 404, { error: 'This number is not on WhatsApp.' });
             }
             outgoing.add(String(text || ''));
             setTimeout(() => outgoing.delete(String(text || '')), 60_000);
-            await client.sendMessage(id._serialized, String(text || ''));
+            if (file && file.data) {
+                // A document (for example a PDF) with the text as its caption.
+                const attachment = new MessageMedia(String(file.mimetype || 'application/pdf'), String(file.data), String(file.filename || 'document.pdf'));
+                await client.sendMessage(id._serialized, attachment, { caption: String(text || ''), sendMediaAsDocument: true });
+            } else {
+                await client.sendMessage(id._serialized, String(text || ''));
+            }
             return reply(response, 200, { sent: true });
+        }
+        if (request.method === 'GET' && request.url.startsWith('/media/')) {
+            const file = media.get(decodeURIComponent(request.url.slice('/media/'.length)));
+            return file ? reply(response, 200, file) : reply(response, 404, { error: 'This file is gone. Send it again.' });
         }
         // The owner's own 1:1 chats, for training a model on their style. Names are replaced by Me / Them; groups,
         // broadcasts and the bot's own chat are left out. Nothing is stored here: the caller gets it as JSON.

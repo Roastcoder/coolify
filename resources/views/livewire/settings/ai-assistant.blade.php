@@ -23,6 +23,8 @@
                             helper="For WhatsApp: send 'unlock your-password' in the chat to allow changes for 15 minutes. Use a password you use nowhere else." />
                         <x-forms.input id="rootNumbers" label="Root WhatsApp numbers" placeholder="919876543210"
                             helper="These numbers manage everything, like the owner. Changes still need the access password. Separate several with commas." />
+                        <x-forms.input id="meharApiUrl" label="Mehar Advisory API" placeholder="https://api.example.com"
+                            helper="Turns on the Mehar WhatsApp bot: dashboard users send 'login' to search loans and payments, check RC and challans and get PDFs. Leave empty to keep it off." />
                     </div>
                     @if (! $hasApiKey && ! str_starts_with($model, \App\Models\AiSettings::LOCAL_PREFIX))
                         <p class="text-sm text-warning">Add a Claude API key, or pick the local model, to turn the assistant on.</p>

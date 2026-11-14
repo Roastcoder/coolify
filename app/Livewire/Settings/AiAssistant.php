@@ -24,6 +24,8 @@ class AiAssistant extends Component
 
     public string $notifyNumbers = '';
 
+    public string $meharApiUrl = '';
+
     public bool $notificationsEnabled = false;
 
     #[Locked]
@@ -48,6 +50,7 @@ class AiAssistant extends Component
         $this->model = $settings->model;
         $this->rootNumbers = (string) $settings->whatsapp_root_numbers;
         $this->notifyNumbers = (string) $settings->whatsapp_notify_numbers;
+        $this->meharApiUrl = (string) $settings->mehar_api_url;
         $this->notificationsEnabled = $settings->whatsapp_notifications_enabled;
         $this->loadState();
     }
@@ -65,9 +68,10 @@ class AiAssistant extends Component
             'model' => ['required', 'in:'.implode(',', array_keys(AiSettings::MODELS))],
             'accessPassword' => ['nullable', 'string', 'min:8', 'max:200'],
             'rootNumbers' => ['nullable', 'string', 'max:500'],
+            'meharApiUrl' => ['nullable', 'url:https', 'max:300'],
         ]);
 
-        $changes = ['model' => $this->model, 'whatsapp_root_numbers' => implode(', ', AiSettings::numbers($this->rootNumbers))];
+        $changes = ['model' => $this->model, 'whatsapp_root_numbers' => implode(', ', AiSettings::numbers($this->rootNumbers)), 'mehar_api_url' => rtrim(trim($this->meharApiUrl), '/') ?: null];
         $this->rootNumbers = $changes['whatsapp_root_numbers'];
         if (filled($this->apiKey)) {
             $changes['api_key'] = trim($this->apiKey);

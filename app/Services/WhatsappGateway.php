@@ -99,6 +99,31 @@ class WhatsappGateway
         }
     }
 
+    /** Sends a file (a PDF, a photo) as a document, with a short caption. */
+    public function sendFile(string $number, string $caption, string $contents, string $filename, string $mimetype = 'application/pdf'): void
+    {
+        $this->request()->timeout(120)->post($this->url('/send'), [
+            'to' => preg_replace('/\D/', '', $number),
+            'text' => mb_substr($caption, 0, 1000),
+            'file' => ['mimetype' => $mimetype, 'data' => base64_encode($contents), 'filename' => $filename],
+        ])->throw();
+    }
+
+    /**
+     * A file someone sent in the last 15 minutes, by the id the gateway gave it.
+     *
+     * @return array{mimetype: string, contents: string, filename: ?string}|null
+     */
+    public function media(string $id): ?array
+    {
+        $response = $this->request()->timeout(60)->get($this->url('/media/'.rawurlencode($id)));
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return ['mimetype' => (string) $response->json('mimetype'), 'contents' => (string) base64_decode((string) $response->json('data')), 'filename' => $response->json('filename')];
+    }
+
     public function isValidSecret(?string $given): bool
     {
         $secret = $this->settings->whatsapp_secret;

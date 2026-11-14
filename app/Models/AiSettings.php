@@ -22,7 +22,7 @@ class AiSettings extends Model
 
     protected $fillable = [
         'api_key', 'model', 'access_password',
-        'whatsapp_secret', 'whatsapp_root_numbers', 'whatsapp_notify_numbers', 'whatsapp_notifications_enabled',
+        'whatsapp_secret', 'whatsapp_root_numbers', 'whatsapp_notify_numbers', 'whatsapp_notifications_enabled', 'mehar_api_url',
     ];
 
     protected $hidden = ['api_key', 'access_password', 'whatsapp_secret'];
