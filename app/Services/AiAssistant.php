@@ -120,8 +120,10 @@ class AiAssistant
     private function chat(AiConversation $conversation, array $messages): string
     {
         $model = substr($this->settings->model, strlen(AiSettings::LOCAL_PREFIX));
-        $name = str_starts_with($model, 'yogii') ? 'Yogii' : 'the assistant';
-        $history = collect($messages)->filter(fn (array $m) => is_string($m['content']))->take(-8)->values()->all();
+        $name = str_starts_with($model, 'yogii') ? 'Yogii' : 'an AI assistant';
+        $owner = $conversation->user?->name ?: 'the owner';
+        // A small model mixes up longer chats: the last two exchanges are enough for a WhatsApp reply.
+        $history = collect($messages)->filter(fn (array $m) => is_string($m['content']))->take(-4)->values()->all();
 
         try {
             $reply = trim((string) Http::timeout(120)->connectTimeout(15)->post('http://coolify-ollama:11434/api/chat', [
@@ -131,7 +133,8 @@ class AiAssistant
                 'keep_alive' => -1, // Stay loaded: loading the model again costs more than the reply.
                 'options' => ['num_predict' => 300],
                 'messages' => [
-                    ['role' => 'system', 'content' => "You are {$name}, the owner's personal AI assistant on StandaloneCoders Cloud. Reply in the user's language, short and friendly, like a WhatsApp message. Never claim to be a human. For servers or apps, tell them to send: status, apps or down."],
+                    // Close to the prompt Yogii was trained with, which gives it the most sensible answers.
+                    ['role' => 'system', 'content' => "You are {$name}, {$owner}'s personal AI assistant. Be practical, accurate, privacy-conscious, and transparent about uncertainty. Never claim to be the human {$owner}. You can only chat: you cannot set reminders, send messages or change anything."],
                     ...$history,
                 ],
             ])->throw()->json('message.content'));
