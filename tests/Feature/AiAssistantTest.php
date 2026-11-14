@@ -194,6 +194,22 @@ it('runs the local model in Ollama without an API key, with thinking off', funct
     Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'anthropic.com'));
 });
 
+it('answers plain chat on a local model fast, without tools, and keeps server questions on the tools', function () {
+    AiSettings::current()->update(['api_key' => null, 'model' => 'local:yogii']);
+    Http::fake([
+        'coolify-ollama:11434/api/chat' => Http::response(['message' => ['content' => 'Hi! I am Yogii.']]),
+        'coolify-ollama:11434/v1/messages' => Http::response(claudeText('Everything is running.')),
+    ]);
+    $conversation = conversationFor($this->admin, channel: 'whatsapp');
+
+    expect((new AiAssistant)->handle($conversation, 'kya haal hai bhai'))->toBe('Hi! I am Yogii.')
+        ->and((new AiAssistant)->handle($conversation->fresh(), 'is the backend down?'))->toBe('Everything is running.')
+        ->and($conversation->fresh()->messages[1])->toBe(['role' => 'assistant', 'content' => 'Hi! I am Yogii.']);
+    Http::assertSent(fn (Request $request) => $request->url() === 'http://coolify-ollama:11434/api/chat'
+        && $request['model'] === 'yogii' && ! isset($request['tools']) && $request['keep_alive'] === -1 && str_contains($request['messages'][0]['content'], 'Yogii'));
+    Http::assertSentCount(2);
+});
+
 it('starts the resource list with a plain summary for small models', function () {
     $summary = (fn (array $servers) => $this->summary($servers))->call(new AiAssistant, [
         ['name' => 'main', 'applications' => [['name' => 'api', 'status' => 'running:healthy'], ['name' => 'web', 'status' => 'exited']], 'databases' => [], 'services' => []],

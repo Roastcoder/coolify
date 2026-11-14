@@ -98,7 +98,53 @@ class AiAssistant
             $messages[] = ['role' => 'user', 'content' => $text];
         }
 
+        if (! $pending && $this->settings->isLocal() && ! $this->isServerQuestion($text)) {
+            return $this->chat($conversation, $messages);
+        }
+
         return $this->run($conversation, $messages);
+    }
+
+    /** Words that need the server tools. Everything else on a local model is plain chat. */
+    private function isServerQuestion(string $text): bool
+    {
+        return (bool) preg_match('/\b(apps?|applications?|servers?|deploy\w*|restart\w*|stop\w*|logs?|databases?|db|down|status|errors?|memory|ram|cpu|disk|containers?|services?|domains?|backups?|uuid|running|crash\w*)\b/i', $text);
+    }
+
+    /**
+     * Plain chat with the local model: a short prompt and no tools, so a CPU-only server answers in seconds
+     * instead of minutes. Server questions go to run() with the tools.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     */
+    private function chat(AiConversation $conversation, array $messages): string
+    {
+        $model = substr($this->settings->model, strlen(AiSettings::LOCAL_PREFIX));
+        $name = str_starts_with($model, 'yogii') ? 'Yogii' : 'the assistant';
+        $history = collect($messages)->filter(fn (array $m) => is_string($m['content']))->take(-8)->values()->all();
+
+        try {
+            $reply = trim((string) Http::timeout(120)->connectTimeout(15)->post('http://coolify-ollama:11434/api/chat', [
+                'model' => $model,
+                'stream' => false,
+                'think' => false,
+                'keep_alive' => -1, // Stay loaded: loading the model again costs more than the reply.
+                'options' => ['num_predict' => 300],
+                'messages' => [
+                    ['role' => 'system', 'content' => "You are {$name}, the owner's personal AI assistant on StandaloneCoders Cloud. Reply in the user's language, short and friendly, like a WhatsApp message. Never claim to be a human. For servers or apps, tell them to send: status, apps or down."],
+                    ...$history,
+                ],
+            ])->throw()->json('message.content'));
+        } catch (RequestException|ConnectionException) {
+            $conversation->update(['messages' => $messages]);
+
+            return 'The AI is not reachable right now. Try again in a minute.';
+        }
+
+        $messages[] = ['role' => 'assistant', 'content' => $reply];
+        $conversation->update(['messages' => $messages]);
+
+        return $reply ?: 'Done.';
     }
 
     /** Instant answers without the AI for the common questions. Null when the AI should answer. */
