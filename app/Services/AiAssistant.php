@@ -45,7 +45,7 @@ class AiAssistant
 
     public function isConfigured(): bool
     {
-        return filled($this->settings->api_key);
+        return $this->settings->isLocal() || filled($this->settings->api_key);
     }
 
     /** Handles one message from the user and returns the reply to show. */
@@ -103,20 +103,25 @@ class AiAssistant
         $response = $this->call([
             'system' => 'You edit files on Linux servers managed by StandaloneCoders Cloud. Apply the requested change and return the complete new file. Change nothing else.',
             'messages' => [['role' => 'user', 'content' => "File: {$path}\n\n<file>\n{$content}\n</file>\n\nChange: {$instruction}"]],
-            'output_config' => ['format' => ['type' => 'json_schema', 'schema' => [
+            ...($this->settings->isLocal() ? [] : ['output_config' => ['format' => ['type' => 'json_schema', 'schema' => [
                 'type' => 'object',
                 'properties' => ['content' => ['type' => 'string']],
                 'required' => ['content'],
                 'additionalProperties' => false,
-            ]]],
+            ]]]]),
         ]);
         if (($response['stop_reason'] ?? null) === 'refusal') {
-            throw new \RuntimeException('Claude declined this change.');
+            throw new \RuntimeException('The AI declined this change.');
+        }
+
+        // Small local models do not support structured output: take the reply as the file, without a code fence.
+        if ($this->settings->isLocal()) {
+            return preg_replace('/^```[^\n]*\n(.*)\n```$/s', '$1', $this->text($response))."\n";
         }
 
         $json = json_decode($this->text($response), true);
         if (! is_string($json['content'] ?? null)) {
-            throw new \RuntimeException('Claude did not return a file.');
+            throw new \RuntimeException('The AI did not return a file.');
         }
 
         return $json['content'];
@@ -172,7 +177,7 @@ class AiAssistant
                 };
             }
 
-            $messages[] = ['role' => 'assistant', 'content' => $response['content']];
+            $messages[] = ['role' => 'assistant', 'content' => $response['content'] ?? []];
 
             if ($response['stop_reason'] === 'refusal') {
                 $conversation->update(['messages' => $messages]);
@@ -187,7 +192,7 @@ class AiAssistant
 
             $results = [];
             $guarded = [];
-            foreach ($response['content'] as $block) {
+            foreach ($response['content'] ?? [] as $block) {
                 if ($block['type'] !== 'tool_use') {
                     continue;
                 }
@@ -218,6 +223,15 @@ class AiAssistant
     private function call(array $body): array
     {
         $model = $this->settings->model ?: 'claude-opus-5-5';
+        if ($this->settings->isLocal()) {
+            // Ollama speaks the same Messages API. Thinking off: much faster on CPU and the small model calls tools more reliably without it.
+            return Http::timeout(600)->connectTimeout(15)->post('http://coolify-ollama:11434/v1/messages', [
+                'model' => substr($model, strlen(AiSettings::LOCAL_PREFIX)),
+                'max_tokens' => 2048,
+                'thinking' => ['type' => 'disabled'],
+                ...$body,
+            ])->throw()->json();
+        }
         $request = Http::withHeaders([
             'x-api-key' => $this->settings->api_key,
             'anthropic-version' => '2023-06-01',

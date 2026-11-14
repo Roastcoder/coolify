@@ -176,3 +176,15 @@ it('routes VS Code behind the admin check', function () {
         ->toContain('address: http://coolify:8080/vscode-auth')
         ->toContain('- sc-vscode-auth');
 });
+
+it('runs the local model in Ollama without an API key, with thinking off', function () {
+    AiSettings::current()->update(['api_key' => null, 'model' => 'local:qwen3:1.7b']);
+    Http::fake(['coolify-ollama:11434/*' => Http::response(claudeText('All apps are up.'))]);
+    $assistant = new AiAssistant;
+
+    expect($assistant->isConfigured())->toBeTrue()
+        ->and($assistant->handle(conversationFor($this->admin, channel: 'web'), 'status?'))->toBe('All apps are up.');
+    Http::assertSent(fn (Request $request) => $request->url() === 'http://coolify-ollama:11434/v1/messages'
+        && $request['model'] === 'qwen3:1.7b' && $request['thinking'] === ['type' => 'disabled'] && ! $request->hasHeader('x-api-key'));
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'anthropic.com'));
+});

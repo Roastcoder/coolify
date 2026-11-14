@@ -7,14 +7,14 @@
         <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
             <form wire:submit="save">
                 <x-application.settings-section title="AI assistant"
-                    description="Claude manages this instance from the AI page and from WhatsApp. Reading is instant; every change or command asks for YES first. On WhatsApp it also needs the access password.">
+                    description="The AI manages this instance from the AI page and from WhatsApp. Reading is instant; every change or command asks for YES first. On WhatsApp it also needs the access password.">
                     <x-slot:actions>
                         <x-forms.button type="submit">Save</x-forms.button>
                         <a href="{{ route('ai.index') }}" class="button" {{ wireNavigate() }}>Open AI</a>
                     </x-slot:actions>
 
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input id="apiKey" type="password" label="Claude API key" autocomplete="off"
+                        <x-forms.input id="apiKey" type="password" label="Claude API key (only for Claude models)" autocomplete="off"
                             :placeholder="$hasApiKey ? 'Saved. Enter a new key to replace it.' : 'sk-ant-…'"
                             helper="From console.anthropic.com. Stored encrypted and never shown again." />
                         <x-forms.listbox id="model" label="Model" :options="$models" />
@@ -24,9 +24,9 @@
                         <x-forms.input id="rootNumbers" label="Root WhatsApp numbers" placeholder="919876543210"
                             helper="These numbers manage everything, like the owner. Changes still need the access password. Separate several with commas." />
                     </div>
-                    @unless ($hasApiKey)
-                        <p class="text-sm text-warning">Add a Claude API key to turn the assistant on.</p>
-                    @endunless
+                    @if (! $hasApiKey && ! str_starts_with($model, \App\Models\AiSettings::LOCAL_PREFIX))
+                        <p class="text-sm text-warning">Add a Claude API key, or pick the local model, to turn the assistant on.</p>
+                    @endif
                 </x-application.settings-section>
             </form>
 

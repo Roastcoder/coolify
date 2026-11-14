@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AiSettings extends Model
 {
+    /** Runs on this server in Ollama (container coolify-ollama), no API key needed. */
+    public const LOCAL_PREFIX = 'local:';
+
     public const MODELS = [
+        'local:qwen3:1.7b' => 'Local Qwen3 1.7B (free, runs on your server, basic)',
         'claude-opus-5-5' => 'Claude Opus 5.5 (best)',
         'claude-sonnet-5-5' => 'Claude Sonnet 5.5 (faster, cheaper)',
         'claude-haiku-5-5' => 'Claude Haiku 5.5 (cheapest)',
@@ -35,6 +39,11 @@ class AiSettings extends Model
     public static function current(): self
     {
         return self::query()->firstOrCreate(['id' => 1], ['model' => 'claude-opus-5-5', 'whatsapp_notifications_enabled' => false]);
+    }
+
+    public function isLocal(): bool
+    {
+        return str_starts_with((string) $this->model, self::LOCAL_PREFIX);
     }
 
     /** @return array<int, string> Numbers that get notifications, digits only. */
