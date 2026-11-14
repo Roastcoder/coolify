@@ -20,6 +20,7 @@ if (SECRET.length < 32) {
 let state = 'starting';
 let qr = null;
 let me = null;
+let meLid = null; // The linked account's private id (…@lid): newer WhatsApp uses it for the "Message yourself" chat.
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/data' }),
@@ -38,6 +39,9 @@ client.on('ready', () => {
     qr = null;
     me = client.info?.wid?.user ?? null;
     console.log('WhatsApp linked:', me);
+    client.getContactLidAndPhone([client.info.wid._serialized])
+        .then(([match]) => { meLid = match?.lid ?? null; })
+        .catch(() => {});
 });
 client.on('auth_failure', () => { state = 'disconnected'; });
 client.on('disconnected', (reason) => {
@@ -52,7 +56,10 @@ client.on('disconnected', (reason) => {
 const outgoing = new Set();
 
 // message_create also fires for messages sent from the linked phone, so the owner can use "Message yourself".
+const mask = (id) => '…' + String(id || '').split('@')[0].slice(-4) + (String(id).includes('@lid') ? '@lid' : '');
+
 client.on('message_create', async (message) => {
+    console.log('Event:', message.type, message.fromMe ? 'own' : 'incoming', 'from', mask(message.from), 'to', mask(message.to));
     if (message.type !== 'chat' || message.from.endsWith('@g.us') || message.from === 'status@broadcast' || !WEBHOOK_URL) {
         return;
     }
@@ -63,7 +70,8 @@ client.on('message_create', async (message) => {
         let number;
         if (message.fromMe) {
             const chat = await message.getChat();
-            const self = message.to === message.from || chat.id.user === me || chat.id._serialized === client.info?.wid?._serialized;
+            const ownIds = [client.info?.wid?._serialized, meLid].filter(Boolean);
+            const self = message.to === message.from || ownIds.includes(message.to) || ownIds.includes(chat.id._serialized);
             if (!self) {
                 return; // The owner writing to someone else.
             }
