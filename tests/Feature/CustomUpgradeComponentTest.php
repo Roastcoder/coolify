@@ -32,7 +32,7 @@ it('offers an update when the newest successful build is a different commit', fu
         ->call('checkUpdate')
         ->assertSet('latestSha', 'bbbbbbb2222222')
         ->assertSet('isUpdateAvailable', true)
-        ->assertSee('Update available');
+        ->assertSee('New version available');
 });
 
 it('hides the update when the running image is the newest build', function () {
@@ -42,7 +42,7 @@ it('hides the update when the running image is the newest build', function () {
     Livewire::test(CustomUpgrade::class)
         ->call('checkUpdate')
         ->assertSet('isUpdateAvailable', false)
-        ->assertDontSee('Update available');
+        ->assertDontSee('New version available');
 });
 
 it('hides the update when the image has no build commit or GitHub is unreachable', function (?string $runningSha, ?string $latestSha) {
@@ -65,3 +65,28 @@ it('only lets instance admins start an update', function () {
         ->call('update')
         ->assertForbidden();
 });
+
+it('reads the build commit of the latest image when GitHub cannot be reached (private repository, no token)', function (string $runningSha, bool $available) {
+    config(['custom_build.sha' => $runningSha, 'custom_build.token' => null]);
+    $image = 'ghcr.io/v2/roastcoder/standalonecoders-cloud';
+    Http::fake([
+        'api.github.com/*' => Http::response(['message' => 'Not Found'], 404),
+        'ghcr.io/token*' => Http::response(['token' => 't']),
+        "{$image}/manifests/latest" => Http::response(['manifests' => [
+            ['digest' => 'sha256:att', 'platform' => ['os' => 'unknown']],
+            ['digest' => 'sha256:amd', 'platform' => ['os' => 'linux', 'architecture' => 'amd64']],
+        ]]),
+        "{$image}/manifests/sha256:amd" => Http::response(['config' => ['digest' => 'sha256:cfg']]),
+        "{$image}/blobs/sha256:cfg" => Http::response(['config' => ['Labels' => ['org.opencontainers.image.revision' => '42684fa8dda58f5e4c6bc290ba373a1d06bc8e1b']]]),
+        // Tag names are not in build order; the old check picked the alphabetically last one.
+        "{$image}/tags/list" => Http::response(['tags' => ['42684fa', '892075d', 'latest']]),
+    ]);
+
+    Livewire::test(CustomUpgrade::class)
+        ->call('checkUpdate')
+        ->assertSet('latestSha', '42684fa8dda58f5e4c6bc290ba373a1d06bc8e1b')
+        ->assertSet('isUpdateAvailable', $available);
+})->with([
+    'running the latest image' => ['42684fa8dda58f5e4c6bc290ba373a1d06bc8e1b', false],
+    'running an older build' => ['892075d0f00000000000000000000000000000000', true],
+]);

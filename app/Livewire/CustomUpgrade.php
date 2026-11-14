@@ -105,25 +105,42 @@ class CustomUpgrade extends Component
             // Fall through to public GHCR tag check
         }
 
-        // If repo is private and no token is present, resolve the latest tag from the public GHCR registry.
-        return $this->fetchLatestGhcrTag();
+        // A private repository without a token: read the commit that :latest was built from, in the public registry.
+        return $this->fetchLatestImageRevision();
     }
 
-    protected function fetchLatestGhcrTag(): ?string
+    /**
+     * The org.opencontainers.image.revision label of ghcr.io/<repository>:latest (set by custom-build.yml).
+     * Tag names cannot tell which build is newest, so the label is the only reliable answer without GitHub access.
+     */
+    protected function fetchLatestImageRevision(): ?string
     {
         try {
-            $imageName = strtolower((string) config('custom_build.repository'));
-            $tokenRes = Http::timeout(5)->get("https://ghcr.io/token?scope=repository:{$imageName}:pull");
-            $token = $tokenRes->json('token');
+            $image = strtolower((string) config('custom_build.repository'));
+            $token = Http::timeout(5)->get('https://ghcr.io/token', ['scope' => "repository:{$image}:pull"])->json('token');
             if (! $token) {
                 return null;
             }
+            $registry = Http::withToken($token)->timeout(10)->accept(implode(', ', [
+                'application/vnd.oci.image.index.v1+json',
+                'application/vnd.docker.distribution.manifest.list.v2+json',
+                'application/vnd.oci.image.manifest.v1+json',
+                'application/vnd.docker.distribution.manifest.v2+json',
+            ]));
 
-            $tagsRes = Http::withToken($token)->timeout(5)->get("https://ghcr.io/v2/{$imageName}/tags/list");
-            $tags = collect($tagsRes->json('tags', []))
-                ->filter(fn ($t) => $t !== 'latest' && ! str_contains($t, '-'));
+            $manifest = $registry->get("https://ghcr.io/v2/{$image}/manifests/latest")->json();
+            // A multi-arch index lists one manifest per platform (and attestations with os "unknown").
+            $platform = collect($manifest['manifests'] ?? [])->first(fn (array $m) => ($m['platform']['os'] ?? null) === 'linux');
+            if ($platform) {
+                $manifest = $registry->get("https://ghcr.io/v2/{$image}/manifests/{$platform['digest']}")->json();
+            }
+            $config = $manifest['config']['digest'] ?? null;
+            if (! $config) {
+                return null;
+            }
+            $revision = $registry->get("https://ghcr.io/v2/{$image}/blobs/{$config}")->json('config.Labels')['org.opencontainers.image.revision'] ?? null;
 
-            return $tags->last();
+            return is_string($revision) && preg_match('/^[0-9a-f]{7,40}$/', $revision) ? $revision : null;
         } catch (\Throwable) {
             return null;
         }
