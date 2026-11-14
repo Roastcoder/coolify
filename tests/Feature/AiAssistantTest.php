@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\AiWhatsappReplyJob;
+use App\Jobs\SendWhatsappMessageJob;
 use App\Livewire\Ai\Editor as CodePage;
 use App\Livewire\Ai\Index as AiPage;
 use App\Livewire\Settings\AiAssistant as AiSettingsPage;
@@ -227,4 +228,23 @@ it('opens a picked app in VS Code and falls back to all files', function () {
         ->assertSee('/vscode/?folder='.rawurlencode('/root/projects/shop-api-abc123'), false)
         ->set('project', '')->call('openProject')
         ->assertSet('folder', VscodeServer::ALL_FILES);
+});
+
+it('answers unknown senders as the personal assistant and passes their messages to the owner', function () {
+    Queue::fake();
+    $secret = ['X-Whatsapp-Secret' => str_repeat('s', 48)];
+    $send = fn (string $id, string $body) => $this->postJson('/webhooks/whatsapp', ['id' => $id, 'number' => '15550001111', 'body' => $body], $secret)->assertOk();
+    $sent = fn () => Queue::pushed(SendWhatsappMessageJob::class)->map(fn ($job) => [$job->number, $job->message])->values()->all();
+
+    $send('g1', 'hello');
+    expect($sent())->toHaveCount(1)->and($sent()[0][0])->toBe('15550001111')->and($sent()[0][1])->toContain('May I know your name');
+
+    $send('g2', 'Ravi here, about the car loan');
+    expect($sent())->toHaveCount(3)
+        ->and($sent()[1])->toBe(['919876543210', "Message for you from +15550001111 (wa.me/15550001111):\n\nRavi here, about the car loan"])
+        ->and($sent()[2][1])->toContain('passed this on');
+
+    $send('g3', 'please call me');
+    expect($sent())->toHaveCount(4)->and($sent()[3][0])->toBe('919876543210');
+    Queue::assertNotPushed(AiWhatsappReplyJob::class);
 });
