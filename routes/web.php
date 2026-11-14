@@ -24,6 +24,7 @@ use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\WebmailController;
 use App\Http\Controllers\WebmailPasswordController;
+use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\UseSessionTeamApiToken;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Ai\Editor as AiEditor;
@@ -165,6 +166,9 @@ Route::middleware('guest')->group(function () {
 });
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
+// Fork-only: Traefik asks this before every request to VS Code (App\Services\VscodeServer). Instance admins only.
+Route::get('/vscode-auth', fn () => response()->noContent(auth()->user()?->isInstanceAdmin() ? 204 : 401))
+    ->withoutMiddleware(DecideWhatToDoWithUser::class)->name('vscode.auth');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
 Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');

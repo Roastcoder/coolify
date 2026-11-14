@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\AiWhatsappReplyJob;
-use App\Livewire\Ai\Editor;
 use App\Livewire\Ai\Index as AiPage;
 use App\Livewire\Settings\AiAssistant as AiSettingsPage;
 use App\Models\AiConversation;
@@ -12,7 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\WhatsappChannel;
 use App\Services\AiAssistant;
-use App\Services\HostFilesystemService;
+use App\Services\VscodeServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -163,22 +162,17 @@ it('opens the settings page on a fresh install', function () {
     Livewire::test(AiSettingsPage::class)->assertOk()->assertSet('model', 'claude-opus-5-5');
 });
 
-it('opens the code editor for instance admins only and checks paths', function () {
-    $this->actingAs($this->admin)->withSession(['currentTeam' => $this->rootTeam]);
-
-    $editor = Livewire::test(Editor::class)->assertDontSee('Unlock root access');
-    expect($editor->instance()->listDir('/etc/../root'))->toBe(['error' => 'Invalid path.'])
-        ->and($editor->instance()->readFile('/etc/hosts'))->toBe(['error' => 'Open a workspace first.'])
-        ->and($editor->instance()->openWorkspace('server:not-mine'))->toHaveKey('error');
-
-    $this->actingAs($this->employee)->withSession(['currentTeam' => $this->employeeTeam]);
-    Livewire::test(Editor::class)->assertRedirect(route('dashboard'));
+it('lets only logged-in instance admins through to VS Code', function () {
+    $this->get('/vscode-auth')->assertUnauthorized();
+    // Traefik only lets a 2xx through; other middleware may answer a redirect instead.
+    expect($this->actingAs($this->employee)->get('/vscode-auth')->status())->not->toBeBetween(200, 299);
+    $this->actingAs($this->admin)->get('/vscode-auth')->assertNoContent();
 });
 
-it('runs server workspace commands on the host, not in a container', function () {
-    $server = Server::factory()->make();
-    $files = new HostFilesystemService($server, '/srv/app');
+it('routes VS Code behind the admin check', function () {
+    $route = app(VscodeServer::class)->proxyRoute('app.example.com');
 
-    expect($files->buildListCommand('/srv/app'))->toStartWith('sh -c ')->not->toContain('docker exec')
-        ->and($files->defaultRoot())->toBe('/srv/app');
+    expect($route)->toContain('Host(`app.example.com`) && PathPrefix(`/vscode`)')
+        ->toContain('address: http://coolify:8080/vscode-auth')
+        ->toContain('- sc-vscode-auth');
 });
