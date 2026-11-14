@@ -6,6 +6,7 @@ use App\Models\AiSettings;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -70,7 +71,7 @@ class MeharBot
                 $this->login($text);
             } elseif (in_array($command, ['menu', 'hi', 'hello', 'start', 'login', 'mehar'], true) || ($command === '0' && in_array($this->step(), ['menu', 'find-loan', 'find-payment', 'rc', 'challan', 'loans', 'payments'], true))) {
                 $this->menu();
-            } else {
+            } elseif ($media || in_array($this->step(), ['upload', 'payment-action'], true) || ! $this->direct($text)) {
                 $this->step($text, $media);
             }
         } catch (ConnectionException) {
@@ -98,12 +99,41 @@ class MeharBot
             'find-payment' => $this->findPayments($text),
             'payments' => $this->openFromList($text, fn (string $id) => $this->showPayment($id)),
             'payment' => $this->paymentChoice($text),
+            'payment-action' => $this->paymentAction($text),
             'rc' => $this->rcSearch($text),
             'challan' => $this->challanCheck($text),
             default => $this->menu(),
         };
 
         return $step;
+    }
+
+    /**
+     * Typed straight in, without picking a menu number first: "rc RJ14AB1234", "challan …", "payment …", "loan …",
+     * or a bare loan, file or vehicle number from any list or detail screen.
+     */
+    private function direct(string $text): bool
+    {
+        if (preg_match('/^(rc|challan|loan|payment|pay)\s+(.+)$/i', $text, $m)) {
+            $query = trim($m[2]);
+            match (strtolower($m[1])) {
+                'rc' => [$this->session['step'] = 'rc', $this->rcSearch($query)],
+                'challan' => [$this->session['step'] = 'challan', $this->challanCheck($query)],
+                'loan' => $this->findLoans($query),
+                default => $this->findPayments($query),
+            };
+
+            return true;
+        }
+        // A single token with letters and digits (MEHCAR0737, RJ60HS6517) is a loan, file or vehicle number.
+        $browsing = in_array($this->step(), ['menu', 'loans', 'loan', 'documents', 'payments', 'payment'], true);
+        if ($browsing && preg_match('/^(?=.*\d)(?=.*[a-z])[a-z0-9\-\/ ]{5,20}$/i', $text) && ! str_contains(trim($text), '  ')) {
+            $this->findLoans($text);
+
+            return true;
+        }
+
+        return false;
     }
 
     // Login
@@ -115,7 +145,7 @@ class MeharBot
 
         if ($step === null || in_array(strtolower($text), ['login', 'mehar'], true)) {
             $this->session = ['step' => 'login-choice'];
-            $this->say("*Yogii · Mehar Advisory login*\n1. 📱 OTP to this WhatsApp number\n2. 🔑 ID and password\n\nReply with a number.");
+            $this->say("*Yogii · Mehar Advisory login*\n\n*1* OTP to this WhatsApp number\n*2* ID and password\n\nReply with a number.");
 
             return;
         }
@@ -196,7 +226,7 @@ class MeharBot
     private function menu(string $lead = ''): void
     {
         $this->session['step'] = 'menu';
-        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n1. 🔎 Find a loan file\n2. 💸 Find a payment application\n3. 🚗 RC search\n4. 🚦 Challan check\n9. 🚪 Log out\n\nReply with a number. *menu* brings you back here."));
+        $this->say(trim($lead."\n\n*Yogii · Mehar Advisory*\n\n*1* Find a loan file\n*2* Find a payment application\n*3* RC search\n*4* Challan check\n*9* Log out\n\nReply with a number, or type a loan or vehicle number straight in. *menu* brings you back here."));
     }
 
     private function menuChoice(string $text): void
@@ -269,27 +299,81 @@ class MeharBot
         $open($id);
     }
 
+    /** The loan screen: every useful field, grouped. Label => backend field (the first filled one wins). */
+    private const LOAN_SECTIONS = [
+        'Customer' => [
+            'Applicant' => 'applicant_name', 'Customer' => 'customer_name', 'Mobile' => 'mobile', 'PAN' => 'pan_number', 'Aadhaar' => 'aadhar_number',
+            'Address' => 'current_address', 'District' => 'current_district', 'State' => 'current_state', 'Pincode' => 'current_pincode',
+            'Income source' => 'income_source', 'Monthly income' => 'monthly_income',
+        ],
+        'Vehicle' => [
+            'Number' => 'vehicle_number', 'Maker' => 'maker_name', 'Model' => 'model_variant_name', 'Mfg year' => 'mfg_year',
+            'Chassis' => 'chassis_number', 'Engine' => 'engine_number', 'RC owner' => 'rc_owner_name', 'Registered' => 'registration_date',
+        ],
+        'Loan' => [
+            'Loan number' => 'loan_number', 'File number' => 'file_number', 'Bank' => ['bank_name', 'assigned_bank_name'], 'Scheme' => 'scheme', 'Vertical' => 'vertical',
+            'Loan amount' => 'loan_amount', 'Sanctioned' => 'sanction_amount', 'Sanction date' => 'sanction_date', 'LTV' => 'ltv', 'IRR' => ['irr', 'interest_rate'],
+            'Tenure' => 'tenure', 'EMI' => ['emi_amount', 'emi'], 'EMI start' => 'emi_start_date', 'EMI end' => 'emi_end_date', 'Processing fee' => 'processing_fee',
+        ],
+        'Disbursement' => [
+            'Net disbursement' => 'net_disbursement_amount', 'Disbursed on' => 'disbursement_date', 'In favour of' => 'payment_in_favour',
+            'Mehar deduction' => 'mehar_deduction', 'Hold amount' => 'hold_amount', 'Received' => 'received_amount_1', 'Received on' => 'received_date_1',
+        ],
+        'Insurance' => [
+            'Company' => 'insurance_company_name', 'Policy' => 'insurance_policy_number', 'Premium' => 'premium_amount', 'Date' => 'insurance_date',
+        ],
+        'Status' => [
+            'Status' => 'status', 'Stage' => 'workflow_stage', 'With' => 'current_assignee_role', 'Branch' => 'our_branch', 'Sourced by' => 'sourcing_person_name',
+            'Logged in' => 'login_date', 'Approved' => 'approval_date', 'PDD' => 'pdd_status', 'RTO agent' => 'rto_agent_name', 'Remark' => 'remark',
+        ],
+    ];
+
     private function showLoan(string $id): void
     {
         $response = $this->authed()?->get("/api/loans/{$id}");
         if (! $response) {
             return;
         }
-        $loan = $response->json('data', $response->json());
+        $loan = (array) $response->json('data', $response->json());
+        $number = (string) ($loan['loan_number'] ?? $loan['file_number'] ?? $id);
         $this->session['step'] = 'loan';
-        $this->session['loan'] = ['id' => $id, 'number' => (string) ($loan['loan_number'] ?? $loan['file_number'] ?? $id)];
-        $fields = [
-            'Loan number' => $loan['loan_number'] ?? null,
-            'File number' => $loan['file_number'] ?? null,
-            'Applicant' => $loan['applicant_name'] ?? null,
-            'Customer' => $loan['customer_name'] ?? null,
-            'Mobile' => $loan['mobile'] ?? $loan['customer_phone'] ?? null,
-            'Vehicle' => trim(($loan['vehicle_number'] ?? '').' '.($loan['maker_name'] ?? '').' '.($loan['model_variant_name'] ?? '')) ?: null,
-            'Bank' => $loan['bank_name'] ?? $loan['assigned_bank_name'] ?? null,
-            'Loan amount' => isset($loan['loan_amount']) ? $this->money($loan['loan_amount']) : null,
-            'Status' => isset($loan['status']) ? Str::headline((string) $loan['status']) : null,
-        ];
-        $this->say("📁 *Loan file*\n".$this->lines($fields)."\n\n1. 📄 Download loan PDF\n2. 📎 Documents\n3. 📤 Upload a document\n4. 💸 Payment applications\n0. ⬅ Back");
+        $this->session['loan'] = ['id' => $id, 'number' => $number];
+
+        $sections = collect(self::LOAN_SECTIONS)->map(function (array $fields, string $title) use ($loan) {
+            $lines = collect($fields)->map(function ($keys, string $label) use ($loan) {
+                $key = collect((array) $keys)->first(fn (string $k) => filled($loan[$k] ?? null));
+
+                return $key ? "*{$label}:* ".$this->value($key, $loan[$key]) : null;
+            })->filter();
+
+            return $lines->isEmpty() ? null : "*— {$title} —*\n".$lines->implode("\n");
+        })->filter();
+
+        $this->say(Str::limit("📁 *Loan file {$number}*\n\n".$sections->implode("\n\n"), 3600)
+            ."\n\n*Reply with a number*\n*1* Loan PDF\n*2* Documents\n*3* Upload a document\n*4* Payment applications\n*5* All fields\n*0* Back");
+    }
+
+    /** One value as people read it: rupees, dates, masked IDs, Yes/No. */
+    private function value(string $key, mixed $value): string
+    {
+        $text = is_bool($value) ? ($value ? 'Yes' : 'No') : trim((string) $value);
+        if (preg_match('/(amount|income|fee|premium|deduction|emi$|^emi_amount$)/', $key) && is_numeric($text)) {
+            return $this->money($text);
+        }
+        if (preg_match('/aadha?r/', $key)) {
+            return '•••• •••• '.substr(preg_replace('/\D/', '', $text), -4);
+        }
+        if (str_contains($key, 'pan_number') && strlen($text) >= 4) {
+            return '••••••'.substr($text, -4);
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/', $text)) {
+            return Carbon::parse($text)->timezone('Asia/Kolkata')->format('d M Y');
+        }
+        if (in_array($key, ['status', 'workflow_stage', 'current_assignee_role', 'pdd_status', 'payment_type'], true)) {
+            return Str::headline($text);
+        }
+
+        return Str::limit($text, 120);
     }
 
     private function loanChoice(string $text): void
@@ -300,8 +384,9 @@ class MeharBot
             '2' => $this->listDocuments($loan['id']),
             '3' => $this->askUpload(),
             '4' => $this->paymentsOfLoan($loan),
+            '5' => $this->fullDetails("/api/loans/{$loan['id']}", "📋 *Loan file {$loan['number']}: all fields*"),
             '0' => $this->findLoansAgain(),
-            default => $this->say('Pick 1 to 4, or *0* to go back.'),
+            default => $this->say('Pick 1 to 5, or *0* to go back.'),
         };
     }
 
@@ -319,7 +404,7 @@ class MeharBot
         }
         $documents = collect($response->json('data', $response->json()) ?? [])->filter(fn ($d) => filled($d['file_url'] ?? null))->take(20)->values();
         if ($documents->isEmpty()) {
-            $this->say("No documents on this file yet.\n\n3. 📤 Upload a document\n0. ⬅ Back");
+            $this->say("No documents on this file yet.\n\n*3* Upload a document\n*0* Back");
 
             return;
         }
@@ -423,7 +508,7 @@ class MeharBot
         $payment = $response->json('data', $response->json());
         $this->session['step'] = 'payment';
         $this->session['payment'] = $id;
-        $this->say("💸 *Payment application*\n".$this->lines([
+        $this->say("💸 *Payment application {$id}*\n\n".$this->lines([
             'Loan number' => $payment['loan_number'] ?? null,
             'Type' => isset($payment['payment_type']) ? Str::headline((string) $payment['payment_type']) : null,
             'Amount' => isset($payment['amount']) ? $this->money($payment['amount']) : null,
@@ -431,15 +516,66 @@ class MeharBot
             'Bank' => trim(($payment['bank_name'] ?? '').' '.(isset($payment['account_number']) ? '••'.substr((string) $payment['account_number'], -4) : '')) ?: null,
             'Status' => isset($payment['status']) ? Str::headline((string) $payment['status']) : null,
             'UTR' => $payment['utr_number'] ?? null,
-        ])."\n\n1. 📄 Download payment PDF\n0. ⬅ Back");
+        ])."\n\n*Reply with a number*\n*1* Payment PDF\n*2* All fields".($this->isApprover() ? "\n*3* Approve\n*4* Reject\n*5* Send back" : '')."\n*0* Back");
+    }
+
+    /** Roles the backend lets act on payment applications; it still checks the stage and the branch. */
+    private function isApprover(): bool
+    {
+        return in_array(strtolower($this->session['role'] ?? ''), ['super_admin', 'admin', 'rbm', 'di', 'insurance_manager', 'accountant', 'accounts'], true);
+    }
+
+    private function askPaymentAction(string $action): void
+    {
+        $this->session['step'] = 'payment-action';
+        $this->session['action'] = $action;
+        $label = ['approve' => 'approve', 'reject' => 'reject', 'send_back' => 'send back'][$action];
+        $this->say("To *{$label}* payment application {$this->session['payment']}, send your remarks now. Your message confirms it.\n\n*0* Cancel");
+    }
+
+    private function paymentAction(string $remarks): void
+    {
+        $action = $this->session['action'] ?? null;
+        unset($this->session['action']);
+        if ($remarks === '0' || ! $action) {
+            $this->showPayment($this->session['payment']);
+
+            return;
+        }
+        $this->session['step'] = 'payment';
+        $response = $this->authed()?->post("/api/payments/applications/{$this->session['payment']}/manager-action", ['action' => $action, 'remarks' => mb_substr($remarks, 0, 1000)]);
+        if (! $response) {
+            return;
+        }
+        $this->say('✅ Done: '.str_replace('_', ' ', $action)." on payment application {$this->session['payment']}.");
+        $this->showPayment($this->session['payment']);
+    }
+
+    /** Every filled field of a record, as the backend returns it for this user's role. */
+    private function fullDetails(string $path, string $title): void
+    {
+        $response = $this->authed()?->get($path);
+        if (! $response) {
+            return;
+        }
+        $record = (array) $response->json('data', $response->json());
+        $hidden = '/(^id$|_id$|password|token|secret|otp|_url$|^created_by|^updated_by)/i';
+        $lines = collect($record)
+            ->filter(fn ($value, $key) => is_scalar($value) && filled($value) && ! preg_match($hidden, (string) $key))
+            ->map(fn ($value, $key) => '*'.Str::headline((string) $key).':* '.$this->value((string) $key, $value));
+        $this->say(Str::limit($title."\n\n".$lines->implode("\n"), 3800)."\n\nThe options above still work. Send *menu* for the main menu.");
     }
 
     private function paymentChoice(string $text): void
     {
         match ($text) {
             '1' => $this->sendPdf("/api/pdf/payment/{$this->session['payment']}", "Payment-{$this->session['payment']}.pdf", "Payment application {$this->session['payment']}"),
+            '2' => $this->fullDetails("/api/payments/applications/{$this->session['payment']}", "📋 *Payment application {$this->session['payment']}: all fields*"),
+            '3' => $this->isApprover() ? $this->askPaymentAction('approve') : $this->say('Pick a number from the list.'),
+            '4' => $this->isApprover() ? $this->askPaymentAction('reject') : $this->say('Pick a number from the list.'),
+            '5' => $this->isApprover() ? $this->askPaymentAction('send_back') : $this->say('Pick a number from the list.'),
             '0' => $this->menuChoice('2'),
-            default => $this->say('Reply *1* for the PDF, or *0* to go back.'),
+            default => $this->say('Pick a number from the list, or *0* to go back.'),
         };
     }
 
@@ -599,7 +735,7 @@ class MeharBot
     /** @param  array<string, mixed>  $fields */
     private function lines(array $fields): string
     {
-        return collect($fields)->filter(fn ($value) => filled($value))->map(fn ($value, string $label) => "{$label}: {$value}")->implode("\n");
+        return collect($fields)->filter(fn ($value) => filled($value))->map(fn ($value, string $label) => "*{$label}:* {$value}")->implode("\n");
     }
 
     private function say(string $text): void

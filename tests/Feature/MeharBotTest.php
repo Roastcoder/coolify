@@ -63,7 +63,7 @@ it('searches loan files, opens one and sends its PDF', function () {
 
     ($this->bot)()->handle('1');
     expect(($this->bot)()->handle('Ravi')[0])->toContain('1. ML-7 · Ravi · RJ14AB1234 · Disbursed');
-    expect(($this->bot)()->handle('1')[0])->toContain('Loan amount: ₹5,00,000')->toContain('Download loan PDF');
+    expect(($this->bot)()->handle('1')[0])->toContain('*Loan amount:* ₹5,00,000')->toContain('*1* Loan PDF');
     $file = ($this->bot)()->handle('1')[0];
     expect($file['file'])->toBe('%PDF-1.4')->and($file['filename'])->toBe('Loan-ML-7.pdf');
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/api/pdf/loan/7') && $r->hasHeader('Authorization', 'Bearer tok-1'));
@@ -77,7 +77,7 @@ it('uploads a document sent on WhatsApp to the open loan file', function () {
         'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'ML-7']]),
         'mehar.test/api/loans/7/documents' => Http::response(['ok' => true]),
     ]);
-    foreach (['1', 'ML-7', '1', '3'] as $message) {
+    foreach (['1', 'ML-7', '3'] as $message) {
         ($this->bot)()->handle($message);
     }
 
@@ -135,7 +135,7 @@ it('opens a loan file straight away when the loan number matches exactly', funct
     ]);
     ($this->bot)()->handle('1');
 
-    expect(($this->bot)()->handle('mehcar 0737')[0])->toContain('Loan file')->toContain('Applicant: Jaygopal');
+    expect(($this->bot)()->handle('mehcar 0737')[0])->toContain('Loan file')->toContain('*Applicant:* Jaygopal');
 });
 
 it('checks challans with the chassis and engine numbers from the RC', function () {
@@ -148,4 +148,56 @@ it('checks challans with the chassis and engine numbers from the RC', function (
 
     expect(($this->bot)()->handle('rj60 hs 6517')[0])->toContain('1 challan(s)')->toContain('₹1,500');
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/challan') && $r['rc_number'] === 'RJ60HS6517' && $r['chassis_number'] === 'CH123' && $r['engine_number'] === 'EN456');
+});
+
+it('shows the loan in sections with readable values', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/loans?search=*' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737']]]),
+        'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'MEHCAR0737', 'aadhar_number' => '123412341234', 'pan_number' => 'ABCDE1234F', 'disbursement_date' => '2026-10-01T00:00:00.000Z', 'emi_amount' => '9850', 'status' => 'disbursed', 'secret_token' => 'x']]),
+    ]);
+    ($this->bot)()->handle('1');
+    $loan = ($this->bot)()->handle('MEHCAR0737')[0];
+
+    expect($loan)->toContain('*— Customer —*')->toContain('*Aadhaar:* •••• •••• 1234')->toContain('*PAN:* ••••••234F')
+        ->toContain('*Disbursed on:* 01 Oct 2026')->toContain('*EMI:* ₹9,850')->toContain('*Status:* Disbursed')
+        ->not->toContain('123412341234')->not->toContain('— Insurance —');
+    expect(($this->bot)()->handle('5')[0])->toContain('*Loan Number:* MEHCAR0737')->not->toContain('Secret Token');
+});
+
+it('takes a loan or vehicle number typed straight in, and rc/challan/payment commands, from any screen', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/loans?search=*' => Http::response(['data' => [['id' => 7, 'loan_number' => 'MEHCAR0737']]]),
+        'mehar.test/api/loans/7' => Http::response(['data' => ['id' => 7, 'loan_number' => 'MEHCAR0737']]),
+        'mehar.test/api/external/surepass/rc-full' => Http::response(['data' => ['owner_name' => 'JAYGOPAL']]),
+        'mehar.test/api/payments/applications' => Http::response([['id' => 3, 'loan_number' => 'MEHCAR0737', 'amount' => 1000]]),
+    ]);
+
+    expect(($this->bot)()->handle('MEHCAR0737')[0])->toContain('Loan file MEHCAR0737');
+    expect(($this->bot)()->handle('rc RJ31UA4510')[0])->toContain('*Owner:* JAYGOPAL');
+    expect(($this->bot)()->handle('payment MEHCAR0737')[0])->toContain('Payment applications');
+});
+
+it('lets an approver approve a payment with remarks, and hides that from others', function () {
+    meharLogin($this->bot);
+    Http::fake([
+        'mehar.test/api/payments/applications/3/manager-action' => Http::response(['ok' => true]),
+        'mehar.test/api/payments/applications/3' => Http::response(['data' => ['id' => 3, 'amount' => 1000, 'status' => 'submitted']]),
+        'mehar.test/api/payments/applications' => Http::response([['id' => 3, 'loan_number' => 'MEHCAR0737']]),
+    ]);
+    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'super_admin'], 60);
+    foreach (['2', 'MEHCAR0737'] as $message) {
+        ($this->bot)()->handle($message);
+    }
+    expect(($this->bot)()->handle('1')[0])->toContain('*3* Approve');
+    expect(($this->bot)()->handle('3')[0])->toContain('send your remarks');
+    expect(($this->bot)()->handle('Checked, OK')[0])->toContain('Done: approve');
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/manager-action') && $r['action'] === 'approve' && $r['remarks'] === 'Checked, OK');
+
+    $session = Cache::get('mehar-bot:919000000001');
+    Cache::put('mehar-bot:919000000001', [...$session, 'role' => 'sales'], 60);
+    ($this->bot)()->handle('payment MEHCAR0737');
+    expect(($this->bot)()->handle('1')[0])->toContain('*2* All fields')->not->toContain('Approve');
+    expect(($this->bot)()->handle('3')[0])->toContain('Pick a number');
 });
