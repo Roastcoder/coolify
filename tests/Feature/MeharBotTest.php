@@ -102,7 +102,7 @@ it('uploads a document sent on WhatsApp to the open loan file', function () {
 it('logs out when the backend says the token expired', function () {
     meharLogin($this->bot);
     Http::fake(['mehar.test/api/external/surepass/rc-full' => Http::response(['error' => 'expired'], 401)]);
-    ($this->bot)()->handle('3');
+    ($this->bot)()->handle('4'); // RC search on the manager desk
 
     expect(($this->bot)()->handle('RJ14AB1234')[0])->toContain('login has expired')
         ->and(Cache::has('mehar-bot:919000000001'))->toBeFalse();
@@ -161,7 +161,7 @@ it('checks challans with the chassis and engine numbers from the RC', function (
         'mehar.test/api/external/surepass/rc-full' => Http::response(['data' => ['vehicle_chasi_number' => 'CH123', 'vehicle_engine_number' => 'EN456']]),
         'mehar.test/api/external/surepass/challan' => Http::response(['data' => ['challan_details' => [['challan_date' => '2026-10-01', 'amount' => 1500, 'challan_status' => 'Pending']]]]),
     ]);
-    ($this->bot)()->handle('4');
+    ($this->bot)()->handle('5'); // Challan check on the manager desk
 
     expect(($this->bot)()->handle('rj60 hs 6517')[0])->toContain('1 challan(s)')->toContain('₹1,500');
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/challan') && $r['rc_number'] === 'RJ60HS6517' && $r['chassis_number'] === 'CH123' && $r['engine_number'] === 'EN456');
@@ -207,7 +207,7 @@ it('lets an approver approve a payment with remarks, and hides that from others'
         'mehar.test/api/payments/applications' => Http::response([['id' => 3, 'loan_number' => 'MEHCAR0737']]),
     ]);
     Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'super_admin'], 60);
-    foreach (['3', 'MEHCAR0737'] as $message) {
+    foreach (['4', 'MEHCAR0737'] as $message) {
         ($this->bot)()->handle($message);
     }
     expect(($this->bot)()->handle('1')[0])->toContain('*3* Approve');
@@ -235,21 +235,24 @@ it('shows each role its own menu, queue and summary', function () {
     $role = fn (string $role) => Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => $role, 'step' => 'menu'], 60);
 
     // A manager without an approval stage: no queue.
-    expect(($this->bot)()->handle('menu')[0])->toContain('👤 Asha · Manager')->toContain('*1* 📁 Loan files · CIBIL')->toContain('*5* 📊 My summary')->not->toContain('Waiting for me');
-    expect(($this->bot)()->handle('5')[0])->toContain('Loan files: *40* · active *12*')->toContain('Disbursed: *₹5,00,000*')->toContain('Disbursed: 28');
+    expect(($this->bot)()->handle('menu')[0])->toContain('👔 Manager desk')->toContain('👤 Asha · Manager')->toContain('*1* 📁 Loan files · CIBIL')->toContain('*3* 📊 My summary')->not->toContain('Waiting for me');
+    expect(($this->bot)()->handle('3')[0])->toContain('Loan files: *40* · active *12*')->toContain('Disbursed: *₹5,00,000*')->toContain('Disbursed: 28');
 
     $role('rbm');
-    expect(($this->bot)()->handle('menu')[0])->toContain('*1* ✅ Waiting for me')->toContain('*2* 📁 Loan files');
+    expect(($this->bot)()->handle('menu')[0])->toContain('🧭 RBM desk')->toContain('*1* ✅ Payments to approve')->toContain('*2* 📁 Loan files');
     expect(($this->bot)()->handle('1')[0])->toContain('Waiting for you')->toContain('MEHCAR0737')->not->toContain('MEHCAR0800');
 
     $role('accountant');
-    expect(($this->bot)()->handle('menu')[0])->toContain('*1* ✅ Waiting for me')->toContain('*2* 💳 Payment applications')->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('menu')[0])->toContain('🧾 Accounts desk')->toContain('*1* ✅ Payments to process')->toContain('*2* 💳 Payment applications')->not->toContain('CIBIL');
     expect(($this->bot)()->handle('1')[0])->toContain('MEHCAR0800')->not->toContain('MEHCAR0737');
     $role('accountant');
-    expect(($this->bot)()->handle('6')[0])->toContain('Voucher to make: *2*');
+    expect(($this->bot)()->handle('4')[0])->toContain('Voucher to make: *2*');
 
     $role('sales');
-    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 📁 Loan files')->not->toContain('Waiting for me')->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('menu')[0])->toContain('🚀 Sales desk')->toContain('*1* 📁 Loan files')->not->toContain('✅')->not->toContain('CIBIL');
+
+    $role('bank');
+    expect(($this->bot)()->handle('menu')[0])->toContain('🏦 Bank desk')->toContain('*2* 📊 My summary')->not->toContain('RC search');
 });
 
 it('understands chat as well as the menu', function () {

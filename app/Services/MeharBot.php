@@ -379,16 +379,29 @@ class MeharBot
         'accounts' => ['manager_approved', 'account_processing', 'accounts_processing', 'voucher_created', 'payment_released'],
     ];
 
-    /** Menu entries for this role: approvers and accounts start with their queue, accounts put payments before loans. */
-    private function menuItems(): array
+    /** Each role group's desk: its title, its menu entries in order, and what its queue is called. */
+    private function desk(): array
     {
         $role = strtolower($this->session['role'] ?? '');
 
-        return [
-            ...(isset(self::QUEUE[$role]) ? ['queue'] : []),
-            ...(in_array($role, ['accountant', 'accounts'], true) ? ['payment', 'loan'] : ['loan', 'payment']),
-            'rc', 'challan', 'summary',
-        ];
+        return match (true) {
+            in_array($role, ['super_admin', 'admin', 'company_admin', 'franchise_admin'], true) => ['🛡️ Admin desk', ['queue', 'summary', 'loan', 'payment', 'rc', 'challan'], 'Payments to approve'],
+            $role === 'rbm' => ['🧭 RBM desk', ['queue', 'loan', 'payment', 'summary', 'rc', 'challan'], 'Payments to approve'],
+            $role === 'insurance_manager' => ['☂️ Insurance desk', ['queue', 'payment', 'loan', 'summary'], 'Insurance to check'],
+            $role === 'di' => ['📦 Disbursement desk', ['queue', 'payment', 'loan', 'summary'], 'Disbursements to check'],
+            in_array($role, ['accountant', 'accounts'], true) => ['🧾 Accounts desk', ['queue', 'payment', 'loan', 'summary'], 'Payments to process'],
+            $role === 'pdd_manager' => ['📋 PDD desk', ['loan', 'rc', 'challan', 'summary'], ''],
+            $role === 'manager' || str_ends_with($role, '_manager') => ['👔 Manager desk', ['loan', 'payment', 'summary', 'rc', 'challan'], ''],
+            in_array($role, ['sales', 'employee', 'broker'], true) => ['🚀 Sales desk', ['loan', 'payment', 'rc', 'challan', 'summary'], ''],
+            in_array($role, ['ops', 'operations'], true) => ['⚙️ Operations desk', ['loan', 'rc', 'challan', 'payment', 'summary'], ''],
+            $role === 'bank' => ['🏦 Bank desk', ['loan', 'summary'], ''],
+            default => ['🏦 Mehar Advisory', ['loan', 'payment', 'rc', 'challan', 'summary'], ''],
+        };
+    }
+
+    private function menuItems(): array
+    {
+        return $this->desk()[1];
     }
 
     private function menu(string $lead = ''): void
@@ -398,6 +411,7 @@ class MeharBot
         $name = $this->session['name'] ?? '';
         $items = collect($this->menuItems())->map(function (string $key, int $i) {
             [$icon, $label] = self::MENU_ITEMS[$key];
+            $label = $key === 'queue' ? $this->desk()[2] : $label;
             $extra = match (true) {
                 $key === 'loan' && $this->canSeeCibil() => ' · CIBIL',
                 default => '',
@@ -410,7 +424,7 @@ class MeharBot
             $this->canSeeCibil() => ['*MEHCAR0737*', '*jaygopal ki file*', '*MEHCAR0737 cibil*', '*RJ60HS6517 challan*'],
             default => ['*MEHCAR0737*', '*jaygopal ki file*', '*rc RJ60HS6517*', '*MEHCAR0737 pdf*'],
         };
-        $this->say(trim($lead."\n\n🏦 *Mehar Advisory*\n".($name !== '' ? "👤 {$name}".($role !== '' ? ' · '.Str::headline($role) : '')."\n" : '')
+        $this->say(trim($lead."\n\n*{$this->desk()[0]}* · Mehar Advisory\n".($name !== '' ? "👤 {$name}".($role !== '' ? ' · '.Str::headline($role) : '')."\n" : '')
             ."━━━━━━━━━━━━━━\n{$items}\n━━━━━━━━━━━━━━\n*9* 🚪 Log out\n\n💬 Or just type: ".implode(', ', $tips)."\n_Send *menu* any time._"));
     }
 
