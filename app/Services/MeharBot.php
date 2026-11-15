@@ -364,14 +364,31 @@ class MeharBot
         'payment' => ['💳', 'Payment applications', 'find-payment', 'Send a loan number, RC number, or the applicant, customer or beneficiary name.'],
         'rc' => ['🚗', 'RC search', 'rc', 'Send the vehicle number, for example RJ14AB1234.'],
         'challan' => ['🚦', 'Challan check', 'challan', 'Send the vehicle number to check challans.'],
+        'queue' => ['✅', 'Waiting for me', null, null],
+        'summary' => ['📊', 'My summary', null, null],
     ];
 
-    /** Menu entries in the order this role uses them most: accounts start with payments. */
+    /** Payment statuses each role acts on next, from the backend's manager-action rules. */
+    private const QUEUE = [
+        'insurance_manager' => ['submitted'],
+        'rbm' => ['submitted', 'insurance_approved'],
+        'admin' => ['submitted', 'insurance_approved'],
+        'super_admin' => ['submitted', 'insurance_approved'],
+        'di' => ['manager_approved', 'account_processing', 'voucher_created', 'payment_released'],
+        'accountant' => ['manager_approved', 'account_processing', 'accounts_processing', 'voucher_created', 'payment_released'],
+        'accounts' => ['manager_approved', 'account_processing', 'accounts_processing', 'voucher_created', 'payment_released'],
+    ];
+
+    /** Menu entries for this role: approvers and accounts start with their queue, accounts put payments before loans. */
     private function menuItems(): array
     {
-        return in_array(strtolower($this->session['role'] ?? ''), ['accountant', 'accounts'], true)
-            ? ['payment', 'loan', 'rc', 'challan']
-            : ['loan', 'payment', 'rc', 'challan'];
+        $role = strtolower($this->session['role'] ?? '');
+
+        return [
+            ...(isset(self::QUEUE[$role]) ? ['queue'] : []),
+            ...(in_array($role, ['accountant', 'accounts'], true) ? ['payment', 'loan'] : ['loan', 'payment']),
+            'rc', 'challan', 'summary',
+        ];
     }
 
     private function menu(string $lead = ''): void
@@ -382,7 +399,6 @@ class MeharBot
         $items = collect($this->menuItems())->map(function (string $key, int $i) {
             [$icon, $label] = self::MENU_ITEMS[$key];
             $extra = match (true) {
-                $key === 'payment' && $this->isApprover() => ' · approve',
                 $key === 'loan' && $this->canSeeCibil() => ' · CIBIL',
                 default => '',
             };
@@ -408,6 +424,11 @@ class MeharBot
         $key = ctype_digit($text) ? ($this->menuItems()[(int) $text - 1] ?? null) : null;
         if (! $key) {
             ctype_digit($text) ? $this->menu('Pick one of the numbers.') : $this->askYogii($text);
+
+            return;
+        }
+        if ($key === 'queue' || $key === 'summary') {
+            $key === 'queue' ? $this->findPayments('', statuses: self::QUEUE[strtolower($this->session['role'] ?? '')]) : $this->summary();
 
             return;
         }
@@ -637,7 +658,7 @@ class MeharBot
 
     // Payment applications
 
-    private function findPayments(string $search, ?string $loanId = null): void
+    private function findPayments(string $search, ?string $loanId = null, ?array $statuses = null): void
     {
         $response = $this->authed()?->get('/api/payments/applications');
         if (! $response) {
@@ -645,11 +666,18 @@ class MeharBot
         }
         $needle = Str::lower(preg_replace('/\s+/', '', $search));
         $payments = collect($response->json('data', $response->json()) ?? [])
-            ->filter(fn (array $p) => $loanId !== null
+            ->filter(fn (array $p) => $statuses !== null
+                ? in_array($p['status'] ?? null, $statuses, true)
+                : ($loanId !== null
                 ? (string) ($p['loan_id'] ?? '') === $loanId
                 : collect(['loan_number', 'vehicle_number', 'applicant_name', 'customer_name', 'beneficiary_name', 'id'])
-                    ->contains(fn (string $field) => str_contains(Str::lower(preg_replace('/\s+/', '', (string) ($p[$field] ?? ''))), $needle)))
+                    ->contains(fn (string $field) => str_contains(Str::lower(preg_replace('/\s+/', '', (string) ($p[$field] ?? ''))), $needle))))
             ->take(self::LIST_LIMIT)->values();
+        if ($payments->isEmpty() && $statuses !== null) {
+            $this->menu('🎉 Nothing is waiting for you right now.');
+
+            return;
+        }
         if ($payments->isEmpty()) {
             $this->say(($loanId ? 'No payment applications on this file.' : "No payment application found for \"{$search}\".")."\n\n*0* Back");
             $this->session['step'] = $loanId ? 'loan' : 'find-payment';
@@ -658,10 +686,34 @@ class MeharBot
         }
         $this->session['step'] = 'payments';
         $this->session['list'] = $payments->pluck('id')->map(fn ($id) => (string) $id)->all();
-        $this->say("*Payment applications*\n".$payments->map(fn (array $p, int $i) => ($i + 1).'. '.collect([
+        $this->say(($statuses !== null ? '✅ *Waiting for you*' : '*Payment applications*')."\n".$payments->map(fn (array $p, int $i) => ($i + 1).'. '.collect([
             $p['loan_number'] ?? null, $p['beneficiary_name'] ?? $p['applicant_name'] ?? null,
             isset($p['amount']) ? $this->money($p['amount']) : null, isset($p['status']) ? Str::headline((string) $p['status']) : null,
         ])->filter()->implode(' · '))->implode("\n")."\n\nReply with a number to open one. *0* Back");
+    }
+
+    /** The dashboard numbers for this user; the backend limits them to what the role may see. */
+    private function summary(): void
+    {
+        $response = $this->authed()?->get('/api/dashboard/stats');
+        if (! $response) {
+            return;
+        }
+        $stats = (array) $response->json('stats', []);
+        $lines = [
+            '📁 Loan files: *'.($stats['totalLoans'] ?? 0).'* · active *'.($stats['activeLoans'] ?? 0).'*',
+            '💰 Disbursed: *'.$this->money($stats['totalDisbursed'] ?? 0).'*',
+            ...(($stats['pendingCommissions'] ?? 0) > 0 ? ['⏳ Pending commissions: *'.$this->money($stats['pendingCommissions']).'*'] : []),
+        ];
+        if (in_array(strtolower($this->session['role'] ?? ''), ['accountant', 'accounts'], true)) {
+            $accounts = (array) $this->authed()?->get('/api/payments/stats/accountant')?->json();
+            $lines[] = "\n🧾 *Accounts*\nVoucher to make: *".($accounts['waiting_for_voucher'] ?? 0).'*'
+                ."\nUTR to add: *".($accounts['waiting_for_utr'] ?? 0).'*'
+                ."\nProof to upload: *".($accounts['waiting_for_proof'] ?? 0).'*';
+        }
+        $byStatus = collect($response->json('loansByStatus', []))->sortByDesc('count')->take(6)
+            ->map(fn (array $row) => '• '.Str::headline((string) ($row['status'] ?? '')).': '.($row['count'] ?? 0));
+        $this->say("📊 *My summary*\n\n".implode("\n", $lines).($byStatus->isEmpty() ? '' : "\n\n*Files by status*\n".$byStatus->implode("\n"))."\n\n*0* Menu");
     }
 
     private function paymentsOfLoan(array $loan): void

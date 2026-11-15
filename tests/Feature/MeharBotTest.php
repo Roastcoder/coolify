@@ -207,7 +207,7 @@ it('lets an approver approve a payment with remarks, and hides that from others'
         'mehar.test/api/payments/applications' => Http::response([['id' => 3, 'loan_number' => 'MEHCAR0737']]),
     ]);
     Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'super_admin'], 60);
-    foreach (['2', 'MEHCAR0737'] as $message) {
+    foreach (['3', 'MEHCAR0737'] as $message) {
         ($this->bot)()->handle($message);
     }
     expect(($this->bot)()->handle('1')[0])->toContain('*3* Approve');
@@ -222,16 +222,34 @@ it('lets an approver approve a payment with remarks, and hides that from others'
     expect(($this->bot)()->handle('3')[0])->toContain('Pick a number');
 });
 
-it('shows each role its own menu', function () {
+it('shows each role its own menu, queue and summary', function () {
     meharLogin($this->bot);
-    expect(($this->bot)()->handle('menu')[0])->toContain('👤 Asha · Manager')->toContain('*1* 📁 Loan files · CIBIL')->toContain('*2* 💳 Payment applications');
+    Http::fake([
+        'mehar.test/api/payments/applications' => Http::response([
+            ['id' => 3, 'loan_number' => 'MEHCAR0737', 'status' => 'submitted'],
+            ['id' => 4, 'loan_number' => 'MEHCAR0800', 'status' => 'manager_approved'],
+        ]),
+        'mehar.test/api/payments/stats/accountant' => Http::response(['waiting_for_voucher' => 2, 'waiting_for_utr' => 1, 'waiting_for_proof' => 0]),
+        'mehar.test/api/dashboard/stats' => Http::response(['stats' => ['totalLoans' => 40, 'activeLoans' => 12, 'totalDisbursed' => 500000], 'loansByStatus' => [['status' => 'disbursed', 'count' => 28]]]),
+    ]);
+    $role = fn (string $role) => Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => $role, 'step' => 'menu'], 60);
 
-    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'accountant'], 60);
-    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 💳 Payment applications · approve')->not->toContain('CIBIL');
-    expect(($this->bot)()->handle('1')[0])->toContain('Payment applications');
+    // A manager without an approval stage: no queue.
+    expect(($this->bot)()->handle('menu')[0])->toContain('👤 Asha · Manager')->toContain('*1* 📁 Loan files · CIBIL')->toContain('*5* 📊 My summary')->not->toContain('Waiting for me');
+    expect(($this->bot)()->handle('5')[0])->toContain('Loan files: *40* · active *12*')->toContain('Disbursed: *₹5,00,000*')->toContain('Disbursed: 28');
 
-    Cache::put('mehar-bot:919000000001', [...Cache::get('mehar-bot:919000000001'), 'role' => 'sales'], 60);
-    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 📁 Loan files')->not->toContain('approve')->not->toContain('CIBIL');
+    $role('rbm');
+    expect(($this->bot)()->handle('menu')[0])->toContain('*1* ✅ Waiting for me')->toContain('*2* 📁 Loan files');
+    expect(($this->bot)()->handle('1')[0])->toContain('Waiting for you')->toContain('MEHCAR0737')->not->toContain('MEHCAR0800');
+
+    $role('accountant');
+    expect(($this->bot)()->handle('menu')[0])->toContain('*1* ✅ Waiting for me')->toContain('*2* 💳 Payment applications')->not->toContain('CIBIL');
+    expect(($this->bot)()->handle('1')[0])->toContain('MEHCAR0800')->not->toContain('MEHCAR0737');
+    $role('accountant');
+    expect(($this->bot)()->handle('6')[0])->toContain('Voucher to make: *2*');
+
+    $role('sales');
+    expect(($this->bot)()->handle('menu')[0])->toContain('*1* 📁 Loan files')->not->toContain('Waiting for me')->not->toContain('CIBIL');
 });
 
 it('understands chat as well as the menu', function () {
